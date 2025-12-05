@@ -5,7 +5,7 @@ version = 25
 cloudstream {
     // All of these properties are optional, you can safely remove them
 
-    description = "Film e SerieTV da StreamingCommunity"
+    description = "StreamingCommunity"
     authors = listOf("doGior","DieGon")
 
     /**
