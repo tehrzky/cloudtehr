@@ -159,18 +159,18 @@ class StreamingCommunity : MainAPI() {
     }
 
 
-    override suspend fun search(query: String): List<SearchResponse> {
-        val url = "$mainUrl/search"
-        val params = mapOf("q" to query)
+override suspend fun search(query: String): List<SearchResponse> {
+    val searchUrl = "${mainUrl.substringBeforeLast("/en")}/api/search"
+    val params = mapOf("q" to query, "lang" to "en")
 
-        if (headers["Cookie"].isNullOrEmpty()) {
-            setupHeaders()
-        }
-        val response = app.get(url, params = params, headers = headers).body.string()
-        val result = parseJson<InertiaResponse>(response)
-
-        return searchResponseBuilder(result.props.titles!!)
+    if (headers["Cookie"].isNullOrEmpty()) {
+        setupHeaders()
     }
+    val response = app.get(searchUrl, params = params, headers = headers).body.string()
+    val result = parseJson<it.dogior.hadEnough.SearchResponse>(response)
+
+    return searchResponseBuilder(result.data)
+}
 
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
