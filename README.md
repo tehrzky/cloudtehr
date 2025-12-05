@@ -9,7 +9,7 @@ Fork di doGior: [doGorsHadEnough](https://github.com/doGior/doGiorsHadEnough)
 ## Installazione
 
 Vai in *Impostazioni* -> *Estensioni* -> *Aggiungi
-repository* e nel campo URL scrivi "https://raw.githubusercontent.com/DieGon7771/DieGon7771/builds/repo.json"
+repository* e nel campo URL scrivi "https://raw.githubusercontent.com/tehrzky/cloudtehr/builds/repo.json"
 
 ### Plugin
 Questi sono i plugin disponibili al momento
