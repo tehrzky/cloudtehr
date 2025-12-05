@@ -38,7 +38,7 @@ class StreamingCommunity : MainAPI() {
     override var name = Companion.name
     override var supportedTypes =
         setOf(TvType.Movie, TvType.TvSeries, TvType.Cartoon, TvType.Documentary)
-    override var lang = "it"
+    override var lang = "en"  // Changed from "it" to "en"
     override val hasMainPage = true
 
     companion object {
@@ -49,30 +49,30 @@ class StreamingCommunity : MainAPI() {
             "X-Inertia-Version" to inertiaVersion,
             "X-Requested-With" to "XMLHttpRequest",
         ).toMutableMap()
-        val mainUrl = "https://streamingunity.co/it"
+        val mainUrl = "https://streamingunity.co/en"  // Changed to English version
         var name = "StreamingCommunity"
         val TAG = "SCommunity"
     }
 
     private val sectionNamesList = mainPageOf(
-        "$mainUrl/browse/top10" to "Top 10 di oggi",
-        "$mainUrl/browse/trending" to "I Titoli Del Momento",
-        "$mainUrl/browse/latest" to "Aggiunti di Recente",
-        "$mainUrl/browse/upcoming" to "In Arrivo...",
-        "$mainUrl/browse/genre?g=Animation" to "Animazione",
-        "$mainUrl/browse/genre?g=Adventure" to "Avventura",
-        "$mainUrl/browse/genre?g=Action" to "Azione",
-        "$mainUrl/browse/genre?g=Comedy" to "Commedia",
-        "$mainUrl/browse/genre?g=Crime" to "Crime",
-        "$mainUrl/browse/genre?g=Documentary" to "Documentario",
-        "$mainUrl/browse/genre?g=Drama" to "Dramma",
-        "$mainUrl/browse/genre?g=Family" to "Famiglia",
-        "$mainUrl/browse/genre?g=Science Fiction" to "Fantascienza",
-        "$mainUrl/browse/genre?g=Fantasy" to "Fantasy",
-        "$mainUrl/browse/genre?g=Horror" to "Horror",
-        "$mainUrl/browse/genre?g=Reality" to "Reality",
-        "$mainUrl/browse/genre?g=Romance" to "Romance",
-        "$mainUrl/browse/genre?g=Thriller" to "Thriller",
+        "$mainUrl/browse/top10" to "Today's Top 10",  // Translated
+        "$mainUrl/browse/trending" to "Trending Now",  // Translated
+        "$mainUrl/browse/latest" to "Recently Added",  // Translated
+        "$mainUrl/browse/upcoming" to "Coming Soon",  // Translated
+        "$mainUrl/browse/genre?g=Animation" to "Animation",  // Already English
+        "$mainUrl/browse/genre?g=Adventure" to "Adventure",  // Already English
+        "$mainUrl/browse/genre?g=Action" to "Action",  // Already English
+        "$mainUrl/browse/genre?g=Comedy" to "Comedy",  // Already English
+        "$mainUrl/browse/genre?g=Crime" to "Crime",  // Already English
+        "$mainUrl/browse/genre?g=Documentary" to "Documentary",  // Already English
+        "$mainUrl/browse/genre?g=Drama" to "Drama",  // Already English
+        "$mainUrl/browse/genre?g=Family" to "Family",  // Already English
+        "$mainUrl/browse/genre?g=Science Fiction" to "Science Fiction",  // Already English
+        "$mainUrl/browse/genre?g=Fantasy" to "Fantasy",  // Already English
+        "$mainUrl/browse/genre?g=Horror" to "Horror",  // Already English
+        "$mainUrl/browse/genre?g=Reality" to "Reality",  // Already English
+        "$mainUrl/browse/genre?g=Romance" to "Romance",  // Already English
+        "$mainUrl/browse/genre?g=Thriller" to "Thriller",  // Already English
     )
     override val mainPage = sectionNamesList
 
@@ -113,7 +113,7 @@ class StreamingCommunity : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         var url = mainUrl.substringBeforeLast("/") + "/api" +
                 request.data.substringAfter(mainUrl)
-        val params = mutableMapOf("lang" to "it")
+        val params = mutableMapOf("lang" to "en")  // Changed from "it" to "en"
 
         val section = request.data.substringAfterLast("/")
         when (section) {
@@ -174,8 +174,8 @@ class StreamingCommunity : MainAPI() {
 
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val searchUrl = "${mainUrl.replace("/it", "")}/api/search"
-        val params = mutableMapOf("q" to query, "lang" to "it")
+        val searchUrl = "${mainUrl.replace("/en", "")}/api/search"  // Changed from "/it" to "/en"
+        val params = mutableMapOf("q" to query, "lang" to "en")  // Changed from "it" to "en"
         if (page > 0) {
             params["offset"] = ((page - 1) * 60).toString()
         }
@@ -285,7 +285,7 @@ class StreamingCommunity : MainAPI() {
     private fun getActualUrl(url: String) =
         if (!url.contains(mainUrl)) {
             val replacingValue =
-                if (url.contains("/it/")) mainUrl.toHttpUrl().host else mainUrl.toHttpUrl().host + "/it"
+                if (url.contains("/en/")) mainUrl.toHttpUrl().host else mainUrl.toHttpUrl().host + "/en"  // Changed from "/it" to "/en"
             val actualUrl = url.replace(url.toHttpUrl().host, replacingValue)
 
             Log.d("$TAG:UrlFix", "Old: $url\nNew: $actualUrl")
@@ -350,7 +350,7 @@ class StreamingCommunity : MainAPI() {
 
         VixCloudExtractor().getUrl(
             url = iframeSrc,
-            referer = mainUrl.substringBeforeLast("it"),
+            referer = mainUrl.substringBeforeLast("en"),  // Changed from "it" to "en"
             subtitleCallback = subtitleCallback,
             callback = callback
         )
