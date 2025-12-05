@@ -283,16 +283,21 @@ override suspend fun search(query: String): List<SearchResponse> {
     }
 
     private fun getActualUrl(url: String) =
-        if (!url.contains(mainUrl)) {
-            val replacingValue =
-                if (url.contains("/en/")) mainUrl.toHttpUrl().host else mainUrl.toHttpUrl().host + "/en"  // Changed from "/it" to "/en"
-            val actualUrl = url.replace(url.toHttpUrl().host, replacingValue)
-
-            Log.d("$TAG:UrlFix", "Old: $url\nNew: $actualUrl")
-            actualUrl
-        } else {
-            url
-        }
+    if (!url.contains(mainUrl)) {
+        // Extract just the path without any language code
+        val urlObj = url.toHttpUrl()
+        val path = urlObj.encodedPath
+            .replace("/it/", "/")
+            .replace("/en/", "/")
+        
+        // Build new URL with correct host and /en path
+        val actualUrl = "https://${mainUrl.toHttpUrl().host}/en${path}"
+        
+        Log.d("$TAG:UrlFix", "Old: $url\nNew: $actualUrl")
+        actualUrl
+    } else {
+        url
+    }
 
     private suspend fun getEpisodes(props: Props): List<Episode> {
         val episodeList = mutableListOf<Episode>()
