@@ -6,8 +6,8 @@ cloudstream {
     language = "en"
     // All of these properties are optional, you can safely remove them
 
-    description = "StreamingCommunity"
-    authors = listOf("doGior","DieGon")
+    description = "StreamingCommunity English"
+    authors = listOf("doGior","DieGon","Tehrzky")
 
     /**
     * Status int as the following:
