@@ -3,6 +3,7 @@ version = 26
 
 
 cloudstream {
+    language = "en"
     // All of these properties are optional, you can safely remove them
 
     description = "StreamingCommunity"
@@ -25,7 +26,7 @@ cloudstream {
 
 
     requiresResources = false
-    language = "en"
+    
 
     iconUrl = "https://streamingunity.to/apple-touch-icon.png?v=2"
 }
