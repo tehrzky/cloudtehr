@@ -1,0 +1,69 @@
+[
+    {
+        "url": "https://raw.githubusercontent.com/tehrzky/cloudtehr/builds/MovHub.cs3",
+        "status": 1,
+        "version": 41,
+        "name": "MovHub",
+        "internalName": "MovHub",
+        "authors": [
+            "Yuzono",
+            "Tehrzky"
+        ],
+        "description": "MovHub",
+        "fileSize": 29825,
+        "repositoryUrl": "https://github.com/tehrzky/cloudtehr",
+        "language": "en",
+        "tvTypes": [
+            "TvSeries",
+            "Movie",
+            "Documentary",
+            "Cartoon"
+        ],
+        "iconUrl": "https://raw.githubusercontent.com/DieGon7771/ItaliaInStreaming/master/StreamingCommunity/streamingunity_icon.png",
+        "apiVersion": 1
+    },
+    {
+        "url": "https://raw.githubusercontent.com/tehrzky/cloudtehr/builds/StreamingCommunity.cs3",
+        "status": 1,
+        "version": 41,
+        "name": "StreamingCommunity",
+        "internalName": "StreamingCommunity",
+        "authors": [
+            "doGior",
+            "DieGon"
+        ],
+        "description": "StreamingCommunity",
+        "fileSize": 59436,
+        "repositoryUrl": "https://github.com/tehrzky/cloudtehr",
+        "language": "en",
+        "tvTypes": [
+            "TvSeries",
+            "Movie",
+            "Documentary",
+            "Cartoon"
+        ],
+        "iconUrl": "https://raw.githubusercontent.com/DieGon7771/ItaliaInStreaming/master/StreamingCommunity/streamingunity_icon.png",
+        "apiVersion": 1
+    },
+    {
+        "url": "https://raw.githubusercontent.com/tehrzky/cloudtehr/builds/TokuZilla.cs3",
+        "status": 1,
+        "version": 1,
+        "name": "TokuZilla",
+        "internalName": "TokuZilla",
+        "authors": [
+            "KaifTaufiq,Phisher98"
+        ],
+        "description": "Stream tokusatsu content including Power Ranger, Kamen Rider, Super Sentai, Metal Heroes, and other Japanese special effect series with English subs",
+        "fileSize": 18576,
+        "repositoryUrl": "https://github.com/tehrzky/cloudtehr",
+        "language": "en",
+        "tvTypes": [
+            "TvSeries",
+            "Movie",
+            "Anime"
+        ],
+        "iconUrl": "https://raw.githubusercontent.com/tehrzky/cloudtehr/refs/heads/master/TokuZilla/icon.png",
+        "apiVersion": 1
+    }
+]
