@@ -100,16 +100,11 @@ class TokuzlProvider : MainAPI() {
                 val m3u8Links = m3u8Regex.findAll(scriptData).map { it.value }.toList()
                 
                 m3u8Links.forEach { m3u8Url ->
-                    callback.invoke(
-                        ExtractorLink(
-                            name,
-                            name,
-                            m3u8Url,
-                            iframe,
-                            Qualities.Unknown.value,
-                            true
-                        )
-                    )
+                    M3u8Helper.generateM3u8(
+                        name,
+                        m3u8Url,
+                        iframe
+                    ).forEach(callback)
                 }
             }
             
@@ -118,16 +113,11 @@ class TokuzlProvider : MainAPI() {
                 ?: iframeDoc.selectFirst("video")?.attr("src")
             
             if (videoSrc != null && videoSrc.contains(".m3u8")) {
-                callback.invoke(
-                    ExtractorLink(
-                        name,
-                        name,
-                        fixUrl(videoSrc),
-                        iframe,
-                        Qualities.Unknown.value,
-                        true
-                    )
-                )
+                M3u8Helper.generateM3u8(
+                    name,
+                    fixUrl(videoSrc),
+                    iframe
+                ).forEach(callback)
             }
         }
         
@@ -141,16 +131,11 @@ class TokuzlProvider : MainAPI() {
             val m3u8Links = m3u8Regex.findAll(pageScript).map { it.value }.toList()
             
             m3u8Links.forEach { m3u8Url ->
-                callback.invoke(
-                    ExtractorLink(
-                        name,
-                        name,
-                        m3u8Url,
-                        data,
-                        Qualities.Unknown.value,
-                        true
-                    )
-                )
+                M3u8Helper.generateM3u8(
+                    name,
+                    m3u8Url,
+                    data
+                ).forEach(callback)
             }
         }
         
