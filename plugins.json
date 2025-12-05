@@ -1,0 +1,26 @@
+[
+    {
+        "url": "https://raw.githubusercontent.com/tehrzky/cloudtehr/builds/StreamingCommunity.cs3",
+        "status": 1,
+        "version": 26,
+        "name": "StreamingCommunity",
+        "internalName": "StreamingCommunity",
+        "authors": [
+            "doGior",
+            "DieGon",
+            "Tehrzky"
+        ],
+        "description": "StreamingCommunity English",
+        "fileSize": 41770,
+        "repositoryUrl": "https://github.com/tehrzky/cloudtehr",
+        "language": "en",
+        "tvTypes": [
+            "TvSeries",
+            "Movie",
+            "Documentary",
+            "Cartoon"
+        ],
+        "iconUrl": "https://streamingunity.to/apple-touch-icon.png?v=2",
+        "apiVersion": 1
+    }
+]

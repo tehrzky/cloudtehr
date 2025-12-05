@@ -1,0 +1,9 @@
+{
+  "name": "tehrzky Repository",
+  "iconUrl": "https://raw.githubusercontent.com/tehrzky/cloudtehr/master/repo_icon.png",
+  "description": "My Repository",
+  "manifestVersion": 1,
+  "pluginLists": [
+    "https://raw.githubusercontent.com/tehrzky/cloudtehr/builds/plugins.json"
+  ]
+}
