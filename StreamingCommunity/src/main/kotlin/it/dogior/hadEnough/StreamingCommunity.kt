@@ -350,7 +350,7 @@ class StreamingCommunity : MainAPI() {
 
         VixCloudExtractor().getUrl(
             url = iframeSrc,
-            referer = mainUrl.substringBeforeLast("/en") + "/",  // Changed from "it" to "en"
+            referer = mainUrl.substringBeforeLast("/en") + "/en/",  // Changed from "it" to "en"
             subtitleCallback = subtitleCallback,
             callback = callback
         )
