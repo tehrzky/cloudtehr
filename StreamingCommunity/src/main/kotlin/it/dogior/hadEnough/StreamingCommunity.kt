@@ -174,7 +174,7 @@ class StreamingCommunity : MainAPI() {
 
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val searchUrl = "${mainUrl.replace("/en", "")}/api/search"  // Changed from "/it" to "/en"
+        val searchUrl = "${mainUrl.substringBeforeLast("/en")}/api/search"  // Changed from "/it" to "/en"
         val params = mutableMapOf("q" to query, "lang" to "en")  // Changed from "it" to "en"
         if (page > 0) {
             params["offset"] = ((page - 1) * 60).toString()
@@ -350,7 +350,7 @@ class StreamingCommunity : MainAPI() {
 
         VixCloudExtractor().getUrl(
             url = iframeSrc,
-            referer = mainUrl.substringBeforeLast("en"),  // Changed from "it" to "en"
+            referer = mainUrl.substringBeforeLast("/en") + "/",  // Changed from "it" to "en"
             subtitleCallback = subtitleCallback,
             callback = callback
         )
