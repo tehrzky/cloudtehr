@@ -62,11 +62,10 @@ class TokuzlProvider : MainAPI() {
             val epNum = ep.attr("href").substringAfter("?ep=").toIntOrNull() ?: return@mapNotNull null
             val epHref = fixUrl(ep.attr("href"))
             
-            Episode(
-                data = epHref,
-                name = "Episode $epNum",
-                episode = epNum
-            )
+            newEpisode(epHref) {
+                this.name = "Episode $epNum"
+                this.episode = epNum
+            }
         }
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
@@ -103,12 +102,12 @@ class TokuzlProvider : MainAPI() {
                 m3u8Links.forEach { m3u8Url ->
                     callback.invoke(
                         ExtractorLink(
-                            source = name,
-                            name = name,
-                            url = m3u8Url,
-                            referer = iframe,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = true
+                            name,
+                            name,
+                            m3u8Url,
+                            iframe,
+                            Qualities.Unknown.value,
+                            true
                         )
                     )
                 }
@@ -121,12 +120,12 @@ class TokuzlProvider : MainAPI() {
             if (videoSrc != null && videoSrc.contains(".m3u8")) {
                 callback.invoke(
                     ExtractorLink(
-                        source = name,
-                        name = name,
-                        url = fixUrl(videoSrc),
-                        referer = iframe,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = true
+                        name,
+                        name,
+                        fixUrl(videoSrc),
+                        iframe,
+                        Qualities.Unknown.value,
+                        true
                     )
                 )
             }
@@ -144,12 +143,12 @@ class TokuzlProvider : MainAPI() {
             m3u8Links.forEach { m3u8Url ->
                 callback.invoke(
                     ExtractorLink(
-                        source = name,
-                        name = name,
-                        url = m3u8Url,
-                        referer = data,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = true
+                        name,
+                        name,
+                        m3u8Url,
+                        data,
+                        Qualities.Unknown.value,
+                        true
                     )
                 )
             }
