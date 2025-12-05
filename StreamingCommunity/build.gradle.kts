@@ -25,7 +25,7 @@ cloudstream {
 
 
     requiresResources = false
-    language = "it"
+    language = "en"
 
     iconUrl = "https://streamingunity.to/apple-touch-icon.png?v=2"
 }
