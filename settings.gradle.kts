@@ -18,7 +18,7 @@ include(
     "StreamingCommunity",
 //  "TV",
 //    "ToonItalia",
-//    "Tokuzl",
+    "Tokuzl",
 //  "Torrentio"
 //    "YouTube"
 )
