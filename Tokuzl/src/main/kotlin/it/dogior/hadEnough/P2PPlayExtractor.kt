@@ -54,15 +54,15 @@ class P2PPlayExtractor : ExtractorApi() {
                         )
                     ).forEach(callback)
                 } catch (e: Exception) {
-                    // Create ExtractorLink with ExtractorLinkType.M3U8
+                    // Correct constructor call - using positional parameters
                     callback.invoke(
                         ExtractorLink(
-                            name,
-                            name,
-                            m3u8Url,
-                            iframeUrl,
-                            Qualities.Unknown.value,
-                            type = ExtractorLinkType.M3U8
+                            name,                    // source
+                            name,                    // name  
+                            m3u8Url,                 // url
+                            iframeUrl,               // referer
+                            Qualities.Unknown.value, // quality
+                            ExtractorLinkType.M3U8   // type
                         )
                     )
                 }
