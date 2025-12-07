@@ -109,15 +109,15 @@ class Tokuzl : MainAPI() {
                         else -> iframeSrc
                     }
                     
-                    // Correct constructor call - using positional parameters
+                    // Use newExtractorLink for iframes
                     callback.invoke(
-                        ExtractorLink(
-                            name,                    // source
-                            "iframe",                // name  
-                            iframeUrl,               // url
-                            data,                    // referer
-                            Qualities.Unknown.value, // quality
-                            ExtractorLinkType.GENERIC // type
+                        newExtractorLink(
+                            name = name,
+                            source = name,
+                            url = iframeUrl,
+                            referer = data,
+                            quality = Qualities.Unknown.value,
+                            type = ExtractorLinkType.VIDEO
                         )
                     )
                 }
@@ -138,15 +138,15 @@ class Tokuzl : MainAPI() {
                                 data
                             ).forEach(callback)
                         } catch (e: Exception) {
-                            // Correct constructor call - using positional parameters
+                            // Use newExtractorLink for m3u8
                             callback.invoke(
-                                ExtractorLink(
-                                    name,                    // source
-                                    name,                    // name  
-                                    m3u8Url,                 // url
-                                    data,                    // referer
-                                    Qualities.Unknown.value, // quality
-                                    ExtractorLinkType.M3U8   // type
+                                newExtractorLink(
+                                    name = name,
+                                    source = name,
+                                    url = m3u8Url,
+                                    referer = data,
+                                    quality = Qualities.Unknown.value,
+                                    type = ExtractorLinkType.HLS  // or maybe ExtractorLinkType.M3U8
                                 )
                             )
                         }
