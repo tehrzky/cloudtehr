@@ -35,16 +35,18 @@ class TokuzlProvider : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = app.get("${request.data}/page/$page").document
-        val home = document.select("div.film_list-wrap > div.flw-item").mapNotNull {
+        val url = if (page > 1) "${request.data}/page/$page" else request.data
+        val document = app.get(url).document
+        val home = document.select("article").mapNotNull {
             it.toSearchResult()
         }
-        return newHomePageResponse(request.name, home)
+        return newHomePageResponse(request.name, home, hasNext = document.selectFirst("a:contains(Next)") != null)
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val title = this.selectFirst("h3.film-name a")?.text()?.trim() ?: return null
-        val href = fixUrl(this.selectFirst("a")?.attr("href") ?: return null)
+        val titleElem = this.selectFirst("h3 a") ?: return null
+        val title = titleElem.text().trim()
+        val href = fixUrl(titleElem.attr("href"))
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
         
         return newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
@@ -54,7 +56,7 @@ class TokuzlProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query").document
-        return document.select("div.film_list-wrap > div.flw-item").mapNotNull {
+        return document.select("article").mapNotNull {
             it.toSearchResult()
         }
     }
@@ -63,13 +65,16 @@ class TokuzlProvider : MainAPI() {
         val document = app.get(url).document
         
         val title = document.selectFirst("h1")?.text()?.trim() ?: ""
-        val poster = document.selectFirst("div.film-poster img")?.attr("src")
-        val plot = document.select("div.description p").text()
-        val year = document.selectFirst("span:contains(Year)")?.text()?.substringAfter("Year")?.trim()?.toIntOrNull()
+        val poster = document.selectFirst("img[src*=wp-content]")?.attr("src")
+        val plot = document.select("p").text()
         
-        // Get all episodes
-        val episodes = document.select("div.episode-list a, ul li a[href*=?ep=]").mapNotNull { ep ->
-            val epNum = ep.attr("href").substringAfter("?ep=").toIntOrNull() ?: return@mapNotNull null
+        // Extract year from various possible locations
+        val yearText = document.select("p:contains(Year), span:contains(Year)").text()
+        val year = yearText.substringAfter("Year").trim().take(4).toIntOrNull()
+        
+        // Get all episodes from the numbered list
+        val episodes = document.select("ul li a[href*=?ep=]").mapNotNull { ep ->
+            val epNum = ep.text().trim().toIntOrNull() ?: return@mapNotNull null
             val epHref = fixUrl(ep.attr("href"))
             
             newEpisode(epHref) {
