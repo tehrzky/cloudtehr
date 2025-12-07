@@ -7,7 +7,6 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.lagradost.cloudstream3.utils.Qualities
 
 class P2PPlayExtractor : ExtractorApi() {
     override val name = "P2PPlay"
@@ -50,7 +49,7 @@ class P2PPlayExtractor : ExtractorApi() {
                             )
                         ).forEach(callback)
                     } catch (e: Exception) {
-                        // Use the same pattern as VixCloudExtractor
+                        // Use newExtractorLink for m3u8 URLs
                         callback.invoke(
                             newExtractorLink(
                                 source = name,
