@@ -37,15 +37,33 @@ class TokuzlProvider : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page > 1) "${request.data}/page/$page" else request.data
         val document = app.get(url).document
-        val home = document.select("article").mapNotNull {
-            it.toSearchResult()
+        
+        // Select all show containers
+        val home = document.select("h3 a[href*=.html]").mapNotNull { link ->
+            val title = link.text().trim()
+            if (title.isEmpty()) return@mapNotNull null
+            
+            val href = fixUrl(link.attr("href"))
+            // Find the closest img tag (usually in parent's sibling or parent)
+            val posterUrl = link.parent()?.parent()?.selectFirst("img")?.attr("src")
+            
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
+            }
         }
-        return newHomePageResponse(request.name, home, hasNext = document.selectFirst("a:contains(Next)") != null)
+        
+        return newHomePageResponse(
+            request.name, 
+            home, 
+            hasNext = document.selectFirst("a:contains(Next)") != null
+        )
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val titleElem = this.selectFirst("h3 a") ?: return null
+        val titleElem = this.selectFirst("a[href*=.html]") ?: return null
         val title = titleElem.text().trim()
+        if (title.isEmpty()) return null
+        
         val href = fixUrl(titleElem.attr("href"))
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
         
@@ -56,8 +74,16 @@ class TokuzlProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query").document
-        return document.select("article").mapNotNull {
-            it.toSearchResult()
+        return document.select("h3 a[href*=.html]").mapNotNull { link ->
+            val title = link.text().trim()
+            if (title.isEmpty()) return@mapNotNull null
+            
+            val href = fixUrl(link.attr("href"))
+            val posterUrl = link.parent()?.parent()?.selectFirst("img")?.attr("src")
+            
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
+            }
         }
     }
 
