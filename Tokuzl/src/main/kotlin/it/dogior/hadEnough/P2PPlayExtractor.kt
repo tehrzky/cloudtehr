@@ -90,9 +90,10 @@ class P2PPlayExtractor : ExtractorApi() {
                             name,
                             m3u8Url,
                             iframeUrl,
-                            Qualities.Unknown.value,
-                            true
-                        )
+                            Qualities.Unknown.value
+                        ).apply {
+                            this.isM3u8 = true
+                        }
                     )
                 }
             }
