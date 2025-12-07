@@ -109,16 +109,17 @@ class Tokuzl : MainAPI() {
                     else -> iframeSrc
                 }
                 
-                // Create ExtractorLink using apply
-                val link = ExtractorLink().apply {
-                    this.name = "iframe"
-                    this.source = this@Tokuzl.name
-                    this.url = iframeUrl
-                    this.referer = data
-                    this.quality = Qualities.Unknown.value
-                    this.isM3u8 = false
-                }
-                callback.invoke(link)
+                // Use the same pattern as VixCloudExtractor but with GENERIC type for iframes
+                callback.invoke(
+                    newExtractorLink(
+                        source = name,
+                        name = "iframe",
+                        url = iframeUrl,
+                        type = ExtractorLinkType.GENERIC
+                    ) {
+                        this.referer = data
+                    }
+                )
             }
         }
         
