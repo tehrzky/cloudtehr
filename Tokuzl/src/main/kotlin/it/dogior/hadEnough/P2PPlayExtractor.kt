@@ -22,11 +22,9 @@ class P2PPlayExtractor : ExtractorApi() {
         val iframeUrl = if (url.startsWith("//")) "https:$url" else url
         
         try {
-            // Fetch iframe content
             val response = app.get(iframeUrl, referer = referer ?: "")
             val html = response.text
             
-            // Look for m3u8 URLs
             val patterns = listOf(
                 Regex("""(https?://[^"\s]+\.m3u8[^"\s]*)"""),
                 Regex("""["'](https?://[^"']+\.m3u8[^"']*)["']"""),
@@ -57,7 +55,6 @@ class P2PPlayExtractor : ExtractorApi() {
                 }
             }
             
-            // Extract m3u8 URLs
             foundUrls.forEach { m3u8Url ->
                 try {
                     M3u8Helper.generateM3u8(
