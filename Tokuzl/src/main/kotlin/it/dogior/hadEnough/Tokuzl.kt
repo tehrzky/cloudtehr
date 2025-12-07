@@ -109,17 +109,31 @@ class Tokuzl : MainAPI() {
                     else -> iframeSrc
                 }
                 
-                // Use the same pattern as VixCloudExtractor but with GENERIC type for iframes
-                callback.invoke(
-                    newExtractorLink(
-                        source = name,
-                        name = "iframe",
-                        url = iframeUrl,
-                        type = ExtractorLinkType.GENERIC
-                    ) {
-                        this.referer = data
-                    }
-                )
+                // For iframes, we can try using null type or try a different approach
+                // Let's use the basic ExtractorLink constructor for iframes
+                try {
+                    callback.invoke(
+                        ExtractorLink(
+                            name,
+                            "iframe",
+                            iframeUrl,
+                            data,
+                            Qualities.Unknown.value,
+                            false
+                        )
+                    )
+                } catch (e: Exception) {
+                    // If that fails, try using newExtractorLink without type
+                    callback.invoke(
+                        newExtractorLink(
+                            source = name,
+                            name = "iframe",
+                            url = iframeUrl
+                        ) {
+                            this.referer = data
+                        }
+                    )
+                }
             }
         }
         
