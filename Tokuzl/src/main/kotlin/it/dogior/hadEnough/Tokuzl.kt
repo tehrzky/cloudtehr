@@ -109,15 +109,15 @@ class Tokuzl : MainAPI() {
                         else -> iframeSrc
                     }
                     
-                    // Use newExtractorLink for iframes
+                    // Simple ExtractorLink with minimal parameters
                     callback.invoke(
-                        newExtractorLink(
-                            name = name,
-                            source = name,
-                            url = iframeUrl,
-                            referer = data,
-                            quality = Qualities.Unknown.value,
-                            type = ExtractorLinkType.VIDEO
+                        ExtractorLink(
+                            name,
+                            "iframe",
+                            iframeUrl,
+                            data,
+                            Qualities.Unknown.value,
+                            headers = mapOf("Referer" to data)
                         )
                     )
                 }
@@ -138,15 +138,16 @@ class Tokuzl : MainAPI() {
                                 data
                             ).forEach(callback)
                         } catch (e: Exception) {
-                            // Use newExtractorLink for m3u8
+                            // Simple ExtractorLink with minimal parameters
                             callback.invoke(
-                                newExtractorLink(
-                                    name = name,
-                                    source = name,
-                                    url = m3u8Url,
-                                    referer = data,
-                                    quality = Qualities.Unknown.value,
-                                    type = ExtractorLinkType.HLS  // or maybe ExtractorLinkType.M3U8
+                                ExtractorLink(
+                                    name,
+                                    name,
+                                    m3u8Url,
+                                    data,
+                                    Qualities.Unknown.value,
+                                    isM3u8 = true,
+                                    headers = mapOf("Referer" to data)
                                 )
                             )
                         }
