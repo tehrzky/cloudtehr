@@ -7,6 +7,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.newExtractorLink
 
 class P2PPlayExtractor : ExtractorApi() {
     override val name = "P2PPlay"
@@ -54,15 +55,15 @@ class P2PPlayExtractor : ExtractorApi() {
                         )
                     ).forEach(callback)
                 } catch (e: Exception) {
-                    // Correct constructor call - using positional parameters
+                    // Use newExtractorLink
                     callback.invoke(
-                        ExtractorLink(
-                            name,                    // source
-                            name,                    // name  
-                            m3u8Url,                 // url
-                            iframeUrl,               // referer
-                            Qualities.Unknown.value, // quality
-                            ExtractorLinkType.M3U8   // type
+                        newExtractorLink(
+                            name = name,
+                            source = name,
+                            url = m3u8Url,
+                            referer = iframeUrl,
+                            quality = Qualities.Unknown.value,
+                            type = ExtractorLinkType.HLS  // or ExtractorLinkType.M3U8
                         )
                     )
                 }
