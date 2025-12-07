@@ -124,32 +124,33 @@ class TokuzlProvider : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         
-        // Try to find iframe or video source
-        val iframe = document.selectFirst("iframe[src*=p2pplay]")?.attr("src")
-            ?: document.selectFirst("iframe")?.attr("src")
+        // Look for iframe in the page
+        val iframe = document.selectFirst("iframe")?.attr("src")
         
         if (iframe != null) {
-            val iframeDoc = app.get(fixUrl(iframe), referer = data).document
+            val iframeUrl = if (iframe.startsWith("//")) "https:$iframe" else fixUrl(iframe)
             
-            // Extract m3u8 link from iframe
-            val scriptData = iframeDoc.select("script").firstOrNull { 
-                it.data().contains(".m3u8") 
-            }?.data()
+            // Fetch the iframe page
+            val iframeDoc = app.get(iframeUrl, referer = data).document
             
-            if (scriptData != null) {
-                val m3u8Regex = """https?://[^\s"']+\.m3u8[^\s"']*""".toRegex()
-                val m3u8Links = m3u8Regex.findAll(scriptData).map { it.value }.toList()
+            // Method 1: Look for m3u8 in script tags
+            iframeDoc.select("script").forEach { script ->
+                val scriptContent = script.data()
                 
-                m3u8Links.forEach { m3u8Url ->
+                // Find all m3u8 URLs in the script
+                val m3u8Regex = """(https?://[^\s"']+\.m3u8[^\s"']*)""".toRegex()
+                m3u8Regex.findAll(scriptContent).forEach { match ->
+                    val m3u8Url = match.groupValues[1].replace("\\/", "/")
+                    
                     M3u8Helper.generateM3u8(
                         name,
                         m3u8Url,
-                        iframe
+                        iframeUrl
                     ).forEach(callback)
                 }
             }
             
-            // Try extracting from video tag
+            // Method 2: Look for video source tag
             val videoSrc = iframeDoc.selectFirst("video source")?.attr("src")
                 ?: iframeDoc.selectFirst("video")?.attr("src")
             
@@ -157,26 +158,47 @@ class TokuzlProvider : MainAPI() {
                 M3u8Helper.generateM3u8(
                     name,
                     fixUrl(videoSrc),
-                    iframe
+                    iframeUrl
                 ).forEach(callback)
+            }
+            
+            // Method 3: Look for eval/packed JavaScript
+            iframeDoc.select("script").forEach { script ->
+                val scriptContent = script.data()
+                if (scriptContent.contains("eval(") || scriptContent.contains("p,a,c,k,e")) {
+                    // Try to find URLs in packed code
+                    val urlPattern = """(https?:\\?/\\?/[^"'\s]+)""".toRegex()
+                    urlPattern.findAll(scriptContent).forEach { match ->
+                        var url = match.groupValues[1]
+                            .replace("\\/", "/")
+                            .replace("\\", "")
+                        
+                        if (url.contains(".m3u8")) {
+                            M3u8Helper.generateM3u8(
+                                name,
+                                url,
+                                iframeUrl
+                            ).forEach(callback)
+                        }
+                    }
+                }
             }
         }
         
-        // Fallback: try to extract directly from page
-        val pageScript = document.select("script").firstOrNull {
-            it.data().contains(".m3u8")
-        }?.data()
-        
-        if (pageScript != null) {
-            val m3u8Regex = """https?://[^\s"']+\.m3u8[^\s"']*""".toRegex()
-            val m3u8Links = m3u8Regex.findAll(pageScript).map { it.value }.toList()
-            
-            m3u8Links.forEach { m3u8Url ->
-                M3u8Helper.generateM3u8(
-                    name,
-                    m3u8Url,
-                    data
-                ).forEach(callback)
+        // Fallback: Look for direct m3u8 in the main page
+        document.select("script").forEach { script ->
+            val scriptContent = script.data()
+            if (scriptContent.contains(".m3u8")) {
+                val m3u8Regex = """(https?://[^\s"']+\.m3u8[^\s"']*)""".toRegex()
+                m3u8Regex.findAll(scriptContent).forEach { match ->
+                    val m3u8Url = match.groupValues[1].replace("\\/", "/")
+                    
+                    M3u8Helper.generateM3u8(
+                        name,
+                        m3u8Url,
+                        data
+                    ).forEach(callback)
+                }
             }
         }
         
