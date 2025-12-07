@@ -129,13 +129,13 @@ class TokuzlProvider : MainAPI() {
                     // Directly add the iframe URL as a link
                     // CloudStream will automatically use the registered P2PPlayExtractor for p2pplay domains
                     callback.invoke(
-                        newExtractorLink(
-                            name = name,
-                            source = name,
-                            url = iframeUrl,
-                            referer = data,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = false
+                        ExtractorLink(
+                            name,
+                            "iframe",
+                            iframeUrl,
+                            data,
+                            Qualities.Unknown.value,
+                            false
                         )
                     )
                 }
@@ -159,13 +159,13 @@ class TokuzlProvider : MainAPI() {
                             ).forEach(callback)
                         } catch (e: Exception) {
                             callback.invoke(
-                                newExtractorLink(
-                                    name = name,
-                                    source = name,
-                                    url = m3u8Url,
-                                    referer = data,
-                                    quality = Qualities.Unknown.value,
-                                    isM3u8 = true
+                                ExtractorLink(
+                                    name,
+                                    name,
+                                    m3u8Url,
+                                    data,
+                                    Qualities.Unknown.value,
+                                    true
                                 )
                             )
                         }
