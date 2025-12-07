@@ -106,34 +106,19 @@ class Tokuzl : MainAPI() {
                 val iframeUrl = when {
                     iframeSrc.startsWith("//") -> "https:$iframeSrc"
                     iframeSrc.startsWith("/") -> "$mainUrl$iframeSrc"
-                    else -> iframeSrc
+                    else -> iframeUrl
                 }
                 
-                // For iframes, we can try using null type or try a different approach
-                // Let's use the basic ExtractorLink constructor for iframes
-                try {
-                    callback.invoke(
-                        ExtractorLink(
-                            name,
-                            "iframe",
-                            iframeUrl,
-                            data,
-                            Qualities.Unknown.value,
-                            false
-                        )
-                    )
-                } catch (e: Exception) {
-                    // If that fails, try using newExtractorLink without type
-                    callback.invoke(
-                        newExtractorLink(
-                            source = name,
-                            name = "iframe",
-                            url = iframeUrl
-                        ) {
-                            this.referer = data
-                        }
-                    )
-                }
+                // Use newExtractorLink for iframes
+                callback.invoke(
+                    newExtractorLink(
+                        source = name,
+                        name = "iframe",
+                        url = iframeUrl
+                    ) {
+                        this.referer = data
+                    }
+                )
             }
         }
         
