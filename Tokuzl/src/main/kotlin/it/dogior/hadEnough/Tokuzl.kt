@@ -7,13 +7,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 import android.content.Context
 import org.jsoup.nodes.Element
 
-@CloudstreamPlugin
-class TokuzlPlugin : Plugin() {
-    override fun load(context: Context) {
-        registerMainAPI(TokuzlProvider())
-        registerExtractorAPI(P2PPlayExtractor())
-    }
-}
 
 class TokuzlProvider : MainAPI() {
     override var mainUrl = "https://tokuzl.net"
