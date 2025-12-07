@@ -97,65 +97,33 @@ class Tokuzl : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         
+        // Find all iframes - CloudStream will handle extraction automatically
         val iframes = document.select("iframe")
         
-        if (iframes.isNotEmpty()) {
-            iframes.forEach { iframeElement ->
-                val iframeSrc = iframeElement.attr("src")
-                if (iframeSrc.isNotEmpty()) {
-                    val iframeUrl = when {
-                        iframeSrc.startsWith("//") -> "https:$iframeSrc"
-                        iframeSrc.startsWith("/") -> "$mainUrl$iframeSrc"
-                        else -> iframeSrc
-                    }
-                    
-                    // Simple ExtractorLink with minimal parameters
-                    callback.invoke(
-                        ExtractorLink(
-                            name,
-                            "iframe",
-                            iframeUrl,
-                            data,
-                            Qualities.Unknown.value,
-                            headers = mapOf("Referer" to data)
-                        )
+        iframes.forEach { iframeElement ->
+            val iframeSrc = iframeElement.attr("src")
+            if (iframeSrc.isNotEmpty()) {
+                val iframeUrl = when {
+                    iframeSrc.startsWith("//") -> "https:$iframeSrc"
+                    iframeSrc.startsWith("/") -> "$mainUrl$iframeSrc"
+                    else -> iframeSrc
+                }
+                
+                // Just pass the iframe URL - CloudStream will use P2PPlayExtractor
+                // for p2pplay domains automatically
+                callback.invoke(
+                    ExtractorLink(
+                        name,
+                        "iframe",
+                        iframeUrl,
+                        data,
+                        Qualities.Unknown.value,
+                        headers = mapOf("Referer" to data)
                     )
-                }
-            }
-        } else {
-            val scripts = document.select("script")
-            scripts.forEach { script ->
-                val content = script.data()
-                if (content.contains("m3u8")) {
-                    val m3u8Regex = Regex("""["'](https?://[^"']+\.m3u8[^"']*)["']""")
-                    m3u8Regex.findAll(content).forEach { match ->
-                        val m3u8Url = match.groupValues[1].replace("\\/", "/")
-                        
-                        try {
-                            M3u8Helper.generateM3u8(
-                                name,
-                                m3u8Url,
-                                data
-                            ).forEach(callback)
-                        } catch (e: Exception) {
-                            // Simple ExtractorLink with minimal parameters
-                            callback.invoke(
-                                ExtractorLink(
-                                    name,
-                                    name,
-                                    m3u8Url,
-                                    data,
-                                    Qualities.Unknown.value,
-                                    isM3u8 = true,
-                                    headers = mapOf("Referer" to data)
-                                )
-                            )
-                        }
-                    }
-                }
+                )
             }
         }
         
-        return true
+        return iframes.isNotEmpty()
     }
 }
