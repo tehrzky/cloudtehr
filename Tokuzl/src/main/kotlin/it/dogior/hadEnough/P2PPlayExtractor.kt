@@ -76,17 +76,16 @@ class P2PPlayExtractor : ExtractorApi() {
                         )
                     ).forEach(callback)
                 } catch (e: Exception) {
-                    // If M3u8Helper fails, try direct link
+                    // If M3u8Helper fails, create direct link with isM3u8 = true
                     callback.invoke(
                         ExtractorLink(
                             name,
                             name,
                             m3u8Url,
                             iframeUrl,
-                            Qualities.Unknown.value
-                        ).apply {
-                            this.isM3u8 = true
-                        }
+                            Qualities.Unknown.value,
+                            true  // Set isM3u8 here
+                        )
                     )
                 }
             }
