@@ -4,7 +4,9 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.M3u8Helper
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
 
 class P2PPlayExtractor : ExtractorApi() {
@@ -25,44 +27,41 @@ class P2PPlayExtractor : ExtractorApi() {
             val response = app.get(iframeUrl, referer = referer ?: "")
             val html = response.text
             
-            // Look for m3u8 URLs
-            val m3u8Regex = Regex("""["'](https?://[^"']+\.m3u8[^"']*)["']""")
-            val foundUrls = mutableSetOf<String>()
+            // Look for m3u8 URLs - simplified regex
+            val m3u8Regex = Regex("""(https?://[^\s"']+\.m3u8[^\s"']*)""")
             
             m3u8Regex.findAll(html).forEach { match ->
-                val m3u8Url = match.groupValues[1]
+                val m3u8Url = match.value
                     .replace("\\/", "/")
                     .replace("\\", "")
+                    .replace("\"", "")
+                    .replace("'", "")
                     .trim()
                 
-                if (m3u8Url.contains(".m3u8") && !foundUrls.contains(m3u8Url)) {
-                    foundUrls.add(m3u8Url)
-                }
-            }
-            
-            // Extract m3u8 URLs
-            foundUrls.forEach { m3u8Url ->
-                try {
-                    M3u8Helper.generateM3u8(
-                        name,
-                        m3u8Url,
-                        iframeUrl,
-                        headers = mapOf(
-                            "Origin" to mainUrl,
-                            "Referer" to iframeUrl
+                if (m3u8Url.contains(".m3u8")) {
+                    try {
+                        M3u8Helper.generateM3u8(
+                            name,
+                            m3u8Url,
+                            iframeUrl,
+                            headers = mapOf(
+                                "Origin" to mainUrl,
+                                "Referer" to iframeUrl
+                            )
+                        ).forEach(callback)
+                    } catch (e: Exception) {
+                        // Use the same pattern as VixCloudExtractor
+                        callback.invoke(
+                            newExtractorLink(
+                                source = name,
+                                name = name,
+                                url = m3u8Url,
+                                type = ExtractorLinkType.M3U8
+                            ) {
+                                this.referer = iframeUrl
+                            }
                         )
-                    ).forEach(callback)
-                } catch (e: Exception) {
-                    // Try using data class constructor
-                    val link = ExtractorLink().apply {
-                        this.name = this@P2PPlayExtractor.name
-                        this.source = this@P2PPlayExtractor.name
-                        this.url = m3u8Url
-                        this.referer = iframeUrl
-                        this.quality = Qualities.Unknown.value
-                        this.isM3u8 = true
                     }
-                    callback.invoke(link)
                 }
             }
             
