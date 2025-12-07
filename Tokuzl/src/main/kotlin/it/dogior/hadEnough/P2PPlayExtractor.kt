@@ -31,20 +31,13 @@ class P2PPlayExtractor : ExtractorApi() {
             val response = app.get(iframeUrl, headers = headers)
             val html = response.text
             
-            // More aggressive regex patterns
+            // Look for m3u8 URLs
             val patterns = listOf(
-                // Standard m3u8 URLs
                 Regex("""(https?://[^"\s'<>]+\.m3u8[^"\s'<>]*)"""),
-                // Escaped URLs
                 Regex("""(https?:\\/\\/[^"\s'<>]+\\.m3u8[^"\s'<>]*)"""),
-                // In quotes
                 Regex("""["'](https?://[^"']+\.m3u8[^"']*)["']"""),
-                // file: property
                 Regex("""file\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
-                // src attribute
-                Regex("""src\s*=\s*["']([^"']+\.m3u8[^"']*)["']"""),
-                // P2P specific pattern
-                Regex("""(?:source|src|file)["'\s:=]+["']?(https?://[^"'\s]+p2pplay[^"'\s]+\.m3u8[^"'\s]*)""")
+                Regex("""src\s*=\s*["']([^"']+\.m3u8[^"']*)["']""")
             )
             
             val foundUrls = mutableSetOf<String>()
@@ -70,7 +63,7 @@ class P2PPlayExtractor : ExtractorApi() {
                 }
             }
             
-            // Try to extract from found URLs
+            // Extract m3u8 URLs
             foundUrls.forEach { m3u8Url ->
                 try {
                     M3u8Helper.generateM3u8(
