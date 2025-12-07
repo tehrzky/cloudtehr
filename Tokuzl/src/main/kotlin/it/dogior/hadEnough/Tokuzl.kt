@@ -8,7 +8,7 @@ import android.content.Context
 import org.jsoup.nodes.Element
 
 
-class TokuzlProvider : MainAPI() {
+class Tokuzl : MainAPI() {
     override var mainUrl = "https://tokuzl.net"
     override var name = "Tokuzl"
     override var lang = "en"
