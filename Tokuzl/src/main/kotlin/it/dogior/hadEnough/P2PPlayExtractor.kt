@@ -21,45 +21,22 @@ class P2PPlayExtractor : ExtractorApi() {
         val iframeUrl = if (url.startsWith("//")) "https:$url" else url
         
         try {
-            val headers = mapOf(
-                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Referer" to (referer ?: ""),
-                "Accept" to "*/*"
-            )
-            
-            // Fetch iframe content with headers
-            val response = app.get(iframeUrl, headers = headers)
+            // Fetch iframe content
+            val response = app.get(iframeUrl, referer = referer ?: "")
             val html = response.text
             
             // Look for m3u8 URLs
-            val patterns = listOf(
-                Regex("""(https?://[^"\s'<>]+\.m3u8[^"\s'<>]*)"""),
-                Regex("""(https?:\\/\\/[^"\s'<>]+\\.m3u8[^"\s'<>]*)"""),
-                Regex("""["'](https?://[^"']+\.m3u8[^"']*)["']"""),
-                Regex("""file\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
-                Regex("""src\s*=\s*["']([^"']+\.m3u8[^"']*)["']""")
-            )
-            
+            val m3u8Regex = Regex("""["'](https?://[^"']+\.m3u8[^"']*)["']""")
             val foundUrls = mutableSetOf<String>()
             
-            patterns.forEach { pattern ->
-                pattern.findAll(html).forEach { match ->
-                    val matchedUrl = if (match.groupValues.size > 1) {
-                        match.groupValues[1]
-                    } else {
-                        match.value
-                    }
-                    
-                    val cleanUrl = matchedUrl
-                        .replace("\\/", "/")
-                        .replace("\\", "")
-                        .replace("\"", "")
-                        .replace("'", "")
-                        .trim()
-                    
-                    if (cleanUrl.contains(".m3u8") && !foundUrls.contains(cleanUrl)) {
-                        foundUrls.add(cleanUrl)
-                    }
+            m3u8Regex.findAll(html).forEach { match ->
+                val m3u8Url = match.groupValues[1]
+                    .replace("\\/", "/")
+                    .replace("\\", "")
+                    .trim()
+                
+                if (m3u8Url.contains(".m3u8") && !foundUrls.contains(m3u8Url)) {
+                    foundUrls.add(m3u8Url)
                 }
             }
             
@@ -76,17 +53,15 @@ class P2PPlayExtractor : ExtractorApi() {
                         )
                     ).forEach(callback)
                 } catch (e: Exception) {
-                    // If M3u8Helper fails, create direct link with isM3u8 = true
-                    callback.invoke(
-                        ExtractorLink(
-                            name,
-                            name,
-                            m3u8Url,
-                            iframeUrl,
-                            Qualities.Unknown.value,
-                            true
-                        )
-                    )
+                    // Create ExtractorLink without using deprecated constructor
+                    val link = object : ExtractorLink() {
+                        override var name: String = this@P2PPlayExtractor.name
+                        override var url: String = m3u8Url
+                        override var referer: String = iframeUrl
+                        override var quality: Int = Qualities.Unknown.value
+                        override var isM3u8: Boolean = true
+                    }
+                    callback.invoke(link)
                 }
             }
             
