@@ -39,13 +39,11 @@ class TokuzlProvider : MainAPI() {
         val url = if (page > 1) "${request.data}/page/$page" else request.data
         val document = app.get(url).document
         
-        // Select all show containers
         val home = document.select("h3 a[href*=.html]").mapNotNull { link ->
             val title = link.text().trim()
             if (title.isEmpty()) return@mapNotNull null
             
             val href = fixUrl(link.attr("href"))
-            // Find the closest img tag (usually in parent's sibling or parent)
             val posterUrl = link.parent()?.parent()?.selectFirst("img")?.attr("src")
             
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
@@ -82,11 +80,9 @@ class TokuzlProvider : MainAPI() {
         val poster = document.selectFirst("img[src*=wp-content]")?.attr("src")
         val plot = document.select("p").text()
         
-        // Extract year from various possible locations
         val yearText = document.select("p:contains(Year), span:contains(Year)").text()
         val year = yearText.substringAfter("Year").trim().take(4).toIntOrNull()
         
-        // Get all episodes from the numbered list
         val episodes = document.select("ul li a[href*=?ep=]").mapNotNull { ep ->
             val epNum = ep.text().trim().toIntOrNull() ?: return@mapNotNull null
             val epHref = fixUrl(ep.attr("href"))
@@ -112,11 +108,9 @@ class TokuzlProvider : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         
-        // Find all iframes
         val iframes = document.select("iframe")
         
         if (iframes.isNotEmpty()) {
-            // Just extract iframe URLs and let CloudStream handle them
             iframes.forEach { iframeElement ->
                 val iframeSrc = iframeElement.attr("src")
                 if (iframeSrc.isNotEmpty()) {
@@ -126,28 +120,23 @@ class TokuzlProvider : MainAPI() {
                         else -> iframeSrc
                     }
                     
-                    // Directly add the iframe URL as a link
-                    // CloudStream will automatically use the registered P2PPlayExtractor for p2pplay domains
-                    callback.invoke(
-                        ExtractorLink(
-                            name,
-                            "iframe",
-                            iframeUrl,
-                            data,
-                            Qualities.Unknown.value,
-                            false
-                        )
-                    )
+                    // Create ExtractorLink without using deprecated constructor
+                    val link = object : ExtractorLink() {
+                        override var name: String = this@TokuzlProvider.name
+                        override var url: String = iframeUrl
+                        override var referer: String = data
+                        override var quality: Int = Qualities.Unknown.value
+                        override var isM3u8: Boolean = false
+                    }
+                    callback.invoke(link)
                 }
             }
         } else {
-            // Fallback: Try to find direct m3u8 URLs
             val scripts = document.select("script")
             scripts.forEach { script ->
                 val content = script.data()
-                if (content.contains("m3u8") || content.contains("video")) {
-                    // Extract any m3u8 URLs
-                    val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.m3u8[^\s"'<>]*)""")
+                if (content.contains("m3u8")) {
+                    val m3u8Regex = Regex("""["'](https?://[^"']+\.m3u8[^"']*)["']""")
                     m3u8Regex.findAll(content).forEach { match ->
                         val m3u8Url = match.groupValues[1].replace("\\/", "/")
                         
@@ -158,16 +147,15 @@ class TokuzlProvider : MainAPI() {
                                 data
                             ).forEach(callback)
                         } catch (e: Exception) {
-                            callback.invoke(
-                                ExtractorLink(
-                                    name,
-                                    name,
-                                    m3u8Url,
-                                    data,
-                                    Qualities.Unknown.value,
-                                    true
-                                )
-                            )
+                            // Create ExtractorLink without using deprecated constructor
+                            val link = object : ExtractorLink() {
+                                override var name: String = this@TokuzlProvider.name
+                                override var url: String = m3u8Url
+                                override var referer: String = data
+                                override var quality: Int = Qualities.Unknown.value
+                                override var isM3u8: Boolean = true
+                            }
+                            callback.invoke(link)
                         }
                     }
                 }
