@@ -53,17 +53,16 @@ class P2PPlayExtractor : ExtractorApi() {
                         )
                     ).forEach(callback)
                 } catch (e: Exception) {
-                    callback.invoke(
-                        ExtractorLink(
-                            name,
-                            name,
-                            m3u8Url,
-                            iframeUrl,
-                            Qualities.Unknown.value,
-                            isM3u8 = true,
-                            headers = mapOf("Referer" to iframeUrl)
-                        )
-                    )
+                    // Try using data class constructor
+                    val link = ExtractorLink().apply {
+                        this.name = this@P2PPlayExtractor.name
+                        this.source = this@P2PPlayExtractor.name
+                        this.url = m3u8Url
+                        this.referer = iframeUrl
+                        this.quality = Qualities.Unknown.value
+                        this.isM3u8 = true
+                    }
+                    callback.invoke(link)
                 }
             }
             
