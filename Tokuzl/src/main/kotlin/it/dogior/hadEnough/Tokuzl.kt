@@ -134,10 +134,9 @@ class TokuzlProvider : MainAPI() {
                             "iframe",
                             iframeUrl,
                             data,
-                            Qualities.Unknown.value
-                        ).apply {
-                            this.isM3u8 = false
-                        }
+                            Qualities.Unknown.value,
+                            false  // iframe is not m3u8
+                        )
                     )
                 }
             }
@@ -165,10 +164,9 @@ class TokuzlProvider : MainAPI() {
                                     name,
                                     m3u8Url,
                                     data,
-                                    Qualities.Unknown.value
-                                ).apply {
-                                    this.isM3u8 = true
-                                }
+                                    Qualities.Unknown.value,
+                                    true  // m3u8 link
+                                )
                             )
                         }
                     }
