@@ -106,10 +106,10 @@ class Tokuzl : MainAPI() {
                 val iframeUrl = when {
                     iframeSrc.startsWith("//") -> "https:$iframeSrc"
                     iframeSrc.startsWith("/") -> "$mainUrl$iframeSrc"
-                    else -> iframeUrl
+                    else -> iframeSrc
                 }
                 
-                // Use newExtractorLink for iframes
+                // Use newExtractorLink - no type needed for iframes
                 callback.invoke(
                     newExtractorLink(
                         source = name,
@@ -124,4 +124,3 @@ class Tokuzl : MainAPI() {
         
         return iframes.isNotEmpty()
     }
-}
