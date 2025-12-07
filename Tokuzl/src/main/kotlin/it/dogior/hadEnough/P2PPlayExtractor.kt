@@ -28,4 +28,63 @@ class P2PPlayExtractor : ExtractorApi() {
             
             // Look for m3u8 URLs
             val patterns = listOf(
-                Regex("""(https?://[
+                Regex("""(https?://[^"\s]+\.m3u8[^"\s]*)"""),
+                Regex("""["'](https?://[^"']+\.m3u8[^"']*)["']"""),
+                Regex("""file\s*:\s*["']([^"']+\.m3u8[^"']*)["']"""),
+                Regex("""src\s*=\s*["']([^"']+\.m3u8[^"']*)["']""")
+            )
+            
+            val foundUrls = mutableSetOf<String>()
+            
+            patterns.forEach { pattern ->
+                pattern.findAll(html).forEach { match ->
+                    val matchedUrl = if (match.groupValues.size > 1) {
+                        match.groupValues[1]
+                    } else {
+                        match.value
+                    }
+                    
+                    val cleanUrl = matchedUrl
+                        .replace("\\/", "/")
+                        .replace("\\", "")
+                        .replace("\"", "")
+                        .replace("'", "")
+                        .trim()
+                    
+                    if (cleanUrl.contains(".m3u8") && !foundUrls.contains(cleanUrl)) {
+                        foundUrls.add(cleanUrl)
+                    }
+                }
+            }
+            
+            // Extract m3u8 URLs
+            foundUrls.forEach { m3u8Url ->
+                try {
+                    M3u8Helper.generateM3u8(
+                        name,
+                        m3u8Url,
+                        iframeUrl,
+                        headers = mapOf(
+                            "Origin" to mainUrl,
+                            "Referer" to iframeUrl
+                        )
+                    ).forEach(callback)
+                } catch (e: Exception) {
+                    callback.invoke(
+                        newExtractorLink(
+                            source = name,
+                            name = name,
+                            url = m3u8Url,
+                            type = ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = iframeUrl
+                        }
+                    )
+                }
+            }
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+}
