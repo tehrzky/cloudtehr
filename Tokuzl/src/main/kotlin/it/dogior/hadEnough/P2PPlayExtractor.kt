@@ -4,6 +4,7 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
 
@@ -53,15 +54,17 @@ class P2PPlayExtractor : ExtractorApi() {
                         )
                     ).forEach(callback)
                 } catch (e: Exception) {
-                    // Create ExtractorLink without using deprecated constructor
-                    val link = object : ExtractorLink() {
-                        override var name: String = this@P2PPlayExtractor.name
-                        override var url: String = m3u8Url
-                        override var referer: String = iframeUrl
-                        override var quality: Int = Qualities.Unknown.value
-                        override var isM3u8: Boolean = true
-                    }
-                    callback.invoke(link)
+                    // Create ExtractorLink with ExtractorLinkType.M3U8
+                    callback.invoke(
+                        ExtractorLink(
+                            name,
+                            name,
+                            m3u8Url,
+                            iframeUrl,
+                            Qualities.Unknown.value,
+                            type = ExtractorLinkType.M3U8
+                        )
+                    )
                 }
             }
             
