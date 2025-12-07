@@ -6,6 +6,7 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.newExtractorLink
 
 class P2PPlayExtractor : ExtractorApi() {
     override val name = "P2PPlay"
@@ -85,13 +86,13 @@ class P2PPlayExtractor : ExtractorApi() {
                 } catch (e: Exception) {
                     // If M3u8Helper fails, try direct link
                     callback.invoke(
-                        ExtractorLink(
-                            name,
-                            name,
-                            m3u8Url,
-                            iframeUrl,
-                            Qualities.Unknown.value,
-                            true
+                        newExtractorLink(
+                            name = name,
+                            source = name,
+                            url = m3u8Url,
+                            referer = iframeUrl,
+                            quality = Qualities.Unknown.value,
+                            isM3u8 = true
                         )
                     )
                 }
