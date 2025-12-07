@@ -2,7 +2,17 @@ package it.dogior.hadEnough
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
+import com.lagradost.cloudstream3.plugins.Plugin
+import android.content.Context
 import org.jsoup.nodes.Element
+
+@CloudstreamPlugin
+class TokuzlPlugin : Plugin() {
+    override fun load(context: Context) {
+        registerMainAPI(TokuzlProvider())
+    }
+}
 
 class TokuzlProvider : MainAPI() {
     override var mainUrl = "https://tokuzl.net"
