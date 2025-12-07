@@ -53,7 +53,6 @@ class P2PPlayExtractor : ExtractorApi() {
                         )
                     ).forEach(callback)
                 } catch (e: Exception) {
-                    // Simple ExtractorLink with minimal parameters
                     callback.invoke(
                         ExtractorLink(
                             name,
