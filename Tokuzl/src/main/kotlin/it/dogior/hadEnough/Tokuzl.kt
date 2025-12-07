@@ -109,7 +109,7 @@ class Tokuzl : MainAPI() {
                     else -> iframeSrc
                 }
                 
-                // Use newExtractorLink - no type needed for iframes
+                // Use newExtractorLink for iframes
                 callback.invoke(
                     newExtractorLink(
                         source = name,
@@ -124,3 +124,4 @@ class Tokuzl : MainAPI() {
         
         return iframes.isNotEmpty()
     }
+}
