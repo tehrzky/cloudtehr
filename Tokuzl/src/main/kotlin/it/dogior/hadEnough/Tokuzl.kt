@@ -2,11 +2,7 @@ package it.dogior.hadEnough
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
-import com.lagradost.cloudstream3.plugins.Plugin
-import android.content.Context
 import org.jsoup.nodes.Element
-
 
 class Tokuzl : MainAPI() {
     override var mainUrl = "https://tokuzl.net"
@@ -113,15 +109,17 @@ class Tokuzl : MainAPI() {
                         else -> iframeSrc
                     }
                     
-                    // Create ExtractorLink without using deprecated constructor
-                    val link = object : ExtractorLink() {
-                        override var name: String = this@TokuzlProvider.name
-                        override var url: String = iframeUrl
-                        override var referer: String = data
-                        override var quality: Int = Qualities.Unknown.value
-                        override var isM3u8: Boolean = false
-                    }
-                    callback.invoke(link)
+                    // Correct constructor call - using positional parameters
+                    callback.invoke(
+                        ExtractorLink(
+                            name,                    // source
+                            "iframe",                // name  
+                            iframeUrl,               // url
+                            data,                    // referer
+                            Qualities.Unknown.value, // quality
+                            ExtractorLinkType.GENERIC // type
+                        )
+                    )
                 }
             }
         } else {
@@ -140,15 +138,17 @@ class Tokuzl : MainAPI() {
                                 data
                             ).forEach(callback)
                         } catch (e: Exception) {
-                            // Create ExtractorLink without using deprecated constructor
-                            val link = object : ExtractorLink() {
-                                override var name: String = this@TokuzlProvider.name
-                                override var url: String = m3u8Url
-                                override var referer: String = data
-                                override var quality: Int = Qualities.Unknown.value
-                                override var isM3u8: Boolean = true
-                            }
-                            callback.invoke(link)
+                            // Correct constructor call - using positional parameters
+                            callback.invoke(
+                                ExtractorLink(
+                                    name,                    // source
+                                    name,                    // name  
+                                    m3u8Url,                 // url
+                                    data,                    // referer
+                                    Qualities.Unknown.value, // quality
+                                    ExtractorLinkType.M3U8   // type
+                                )
+                            )
                         }
                     }
                 }
