@@ -11,6 +11,7 @@ import org.jsoup.nodes.Element
 class TokuzlPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(TokuzlProvider())
+        registerExtractorAPI(P2PPlayExtractor())
     }
 }
 
