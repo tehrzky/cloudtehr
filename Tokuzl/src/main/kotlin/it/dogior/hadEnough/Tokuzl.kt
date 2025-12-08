@@ -156,12 +156,13 @@ class Tokuzl : MainAPI() {
         // Handle direct video URLs
         if (data.contains(".mp4") || data.contains(".m3u8")) {
             callback.invoke(
-                newExtractorLink(
+                ExtractorLink(
                     source = name,
                     name = "Direct",
                     url = data,
                     referer = mainUrl,
-                    quality = Qualities.Unknown.value
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = data.contains(".m3u8")
                 )
             )
             return true
@@ -177,13 +178,15 @@ class Tokuzl : MainAPI() {
         
         // Extract video tags
         document.select("video source[src]").forEach { source ->
+            val src = fixUrl(source.attr("src"))
             callback.invoke(
-                newExtractorLink(
+                ExtractorLink(
                     source = name,
                     name = "Video",
-                    url = fixUrl(source.attr("src")),
+                    url = src,
                     referer = data,
-                    quality = Qualities.Unknown.value
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = src.contains(".m3u8")
                 )
             )
         }
