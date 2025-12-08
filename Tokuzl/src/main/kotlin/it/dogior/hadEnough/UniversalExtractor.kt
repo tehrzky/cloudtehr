@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.newExtractorLink
 
 class UniversalExtractor : ExtractorApi() {
@@ -21,36 +22,7 @@ class UniversalExtractor : ExtractorApi() {
         println("UniversalExtractor: Processing URL: $url")
         
         try {
-            val response = app.get(url, referer = referer ?: "", timeout = 60)
-            val html = response.text
+            val document = app.get(url, referer = referer ?: "", timeout = 30).document
             
-            // Simple pattern matching for m3u8
-            val m3u8Pattern = Regex("""(https?://[^"'\s]+\.m3u8[^"'\s]*)""", RegexOption.IGNORE_CASE)
-            
-            m3u8Pattern.findAll(html).forEach { match ->
-                val m3u8Url = match.value.trim()
-                if (m3u8Url.isNotEmpty()) {
-                    println("UniversalExtractor: Found m3u8: $m3u8Url")
-                    
-                    // Return direct m3u8 link
-                    callback.invoke(
-                        newExtractorLink(
-                            source = name,
-                            name = "Stream",
-                            url = m3u8Url,
-                            type = ExtractorLinkType.M3U8
-                        ) {
-                            this.referer = referer ?: url
-                        }
-                    )
-                    return
-                }
-            }
-            
-            println("UniversalExtractor: No m3u8 URLs found")
-            
-        } catch (e: Exception) {
-            println("UniversalExtractor: Error: ${e.message}")
-        }
-    }
-}
+            // Look for iframes first (most common)
+            val iframes = document.select
