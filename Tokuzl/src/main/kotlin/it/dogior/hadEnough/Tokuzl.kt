@@ -22,97 +22,41 @@ class Tokuzl : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page > 1) "${request.data}/page/$page" else request.data
+        val document = app.get(url).document
         
-        try {
-            val document = app.get(url).document
-            val items = mutableListOf<SearchResponse>()
+        // Select all show containers using the working selector
+        val home = document.select("h3 a[href*=.html]").mapNotNull { link ->
+            val title = link.text().trim()
+            if (title.isEmpty()) return@mapNotNull null
             
-            // Try multiple selectors to find content
-            val contentSelectors = listOf(
-                "div.post-content a",
-                "div.entry-content a", 
-                ".post-body a",
-                "article a",
-                ".content a"
-            )
+            val href = fixUrl(link.attr("href"))
+            // Find the closest img tag (usually in parent's sibling or parent)
+            val posterUrl = link.parent()?.parent()?.selectFirst("img")?.attr("src")
             
-            for (selector in contentSelectors) {
-                document.select(selector).forEach { link ->
-                    val href = link.attr("href")
-                    val text = link.text().trim()
-                    
-                    // Only get actual show pages
-                    if (href.isNotEmpty() && 
-                        text.isNotEmpty() && 
-                        href.contains(mainUrl) &&
-                        (href.contains("/kamen-rider/") || 
-                         href.contains("/super-sentai/") || 
-                         href.contains("/ultraman/") ||
-                         href.contains("/power-ranger/") ||
-                         href.contains("/garo/") ||
-                         href.contains("/metal-heroes/")) &&
-                        !href.contains("/page/")) {
-                        
-                        // Get poster from nearby img
-                        var poster: String? = null
-                        val parent = link.parent()
-                        parent?.let {
-                            val img = it.selectFirst("img")
-                            poster = img?.attr("src") ?: img?.attr("data-src")
-                            if (!poster.isNullOrEmpty() && !poster!!.startsWith("http")) {
-                                poster = fixUrl(poster!!)
-                            }
-                        }
-                        
-                        items.add(
-                            newTvSeriesSearchResponse(text, fixUrl(href), TvType.TvSeries) {
-                                this.posterUrl = poster
-                            }
-                        )
-                    }
-                }
-                
-                if (items.isNotEmpty()) break
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
             }
-            
-            return newHomePageResponse(
-                request.name, 
-                items.distinctBy { it.url }, 
-                hasNext = document.select("a.next, .nav-next").isNotEmpty()
-            )
-            
-        } catch (e: Exception) {
-            return newHomePageResponse(request.name, emptyList(), hasNext = false)
         }
+        
+        return newHomePageResponse(
+            request.name, 
+            home, 
+            hasNext = document.selectFirst("a:contains(Next)") != null
+        )
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        return try {
-            val document = app.get("$mainUrl/?s=${query.replace(" ", "+")}").document
+        val document = app.get("$mainUrl/?s=$query").document
+        return document.select("h3 a[href*=.html]").mapNotNull { link ->
+            val title = link.text().trim()
+            if (title.isEmpty()) return@mapNotNull null
             
-            document.select("a").mapNotNull { link ->
-                val href = link.attr("href")
-                val title = link.text().trim()
-                
-                if (title.isNotEmpty() && 
-                    href.contains(mainUrl) && 
-                    title.length > 3 &&
-                    (href.contains("/kamen-rider/") || 
-                     href.contains("/super-sentai/") || 
-                     href.contains("/ultraman/") ||
-                     href.contains("/power-ranger/") ||
-                     href.contains("/garo/") ||
-                     href.contains("/metal-heroes/"))) {
-                    
-                    val poster = link.parent()?.selectFirst("img")?.attr("src")
-                    
-                    newTvSeriesSearchResponse(title, fixUrl(href), TvType.TvSeries) {
-                        this.posterUrl = poster?.let { fixUrl(it) }
-                    }
-                } else null
-            }.distinctBy { it.url }
-        } catch (e: Exception) {
-            emptyList()
+            val href = fixUrl(link.attr("href"))
+            val posterUrl = link.parent()?.parent()?.selectFirst("img")?.attr("src")
+            
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
+            }
         }
     }
 
@@ -120,30 +64,42 @@ class Tokuzl : MainAPI() {
         val document = app.get(url).document
         
         val title = document.selectFirst("h1")?.text()?.trim() ?: "Unknown"
-        val poster = document.selectFirst("img")?.attr("src")
-        val description = document.selectFirst(".entry-content p, .post-content p")?.text()
+        val poster = document.selectFirst("img[src*=wp-content]")?.attr("src")
+        val plot = document.select("p").text()
         
-        val episodes = mutableListOf<Episode>()
+        // Extract year from various possible locations
+        val yearText = document.select("p:contains(Year), span:contains(Year)").text()
+        val year = yearText.substringAfter("Year").trim().take(4).toIntOrNull()
         
-        // Find all iframes and video sources
-        document.select("iframe[src]").forEachIndexed { index, iframe ->
-            episodes.add(newEpisode(fixUrl(iframe.attr("src"))) {
-                this.name = "Episode ${index + 1}"
-                this.episode = index + 1
-            })
+        // Get all episodes from the numbered list
+        val episodes = document.select("ul li a[href*=?ep=]").mapNotNull { ep ->
+            val epNum = ep.text().trim().toIntOrNull() ?: return@mapNotNull null
+            val epHref = fixUrl(ep.attr("href"))
+            
+            newEpisode(epHref) {
+                this.name = "Episode $epNum"
+                this.episode = epNum
+            }
         }
-        
-        // If no iframes, just use the page URL
+
+        // If no episodes found, use the page itself
         if (episodes.isEmpty()) {
-            episodes.add(newEpisode(url) {
-                this.name = "Watch"
-                this.episode = 1
-            })
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, listOf(
+                newEpisode(url) {
+                    this.name = "Watch"
+                    this.episode = 1
+                }
+            )) {
+                this.posterUrl = poster
+                this.year = year
+                this.plot = plot
+            }
         }
-        
+
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-            this.posterUrl = poster?.let { fixUrl(it) }
-            this.plot = description
+            this.posterUrl = poster
+            this.year = year
+            this.plot = plot
         }
     }
 
@@ -153,42 +109,78 @@ class Tokuzl : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Handle direct video URLs
-        if (data.contains(".mp4") || data.contains(".m3u8")) {
-            callback.invoke(
-                ExtractorLink(
-                    source = name,
-                    name = "Direct",
-                    url = data,
-                    referer = mainUrl,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = data.contains(".m3u8")
-                )
-            )
-            return true
-        }
-        
-        // Load the page and extract sources
         val document = app.get(data).document
         
-        // Extract iframes
-        document.select("iframe[src]").forEach { iframe ->
-            loadExtractor(fixUrl(iframe.attr("src")), subtitleCallback, callback)
-        }
+        // Find iframes
+        val iframes = document.select("iframe")
         
-        // Extract video tags
-        document.select("video source[src]").forEach { source ->
-            val src = fixUrl(source.attr("src"))
-            callback.invoke(
-                ExtractorLink(
-                    source = name,
-                    name = "Video",
-                    url = src,
-                    referer = data,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = src.contains(".m3u8")
-                )
-            )
+        if (iframes.isEmpty()) {
+            // No iframe found, try to find script with video source
+            val scripts = document.select("script")
+            scripts.forEach { script ->
+                val content = script.data()
+                if (content.contains("m3u8") || content.contains("p2pplay") || content.contains("video")) {
+                    // Extract any m3u8 URLs
+                    val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.m3u8[^\s"'<>]*)""")
+                    m3u8Regex.findAll(content).forEach { match ->
+                        val m3u8Url = match.groupValues[1].replace("\\/", "/")
+                        
+                        try {
+                            M3u8Helper.generateM3u8(
+                                name,
+                                m3u8Url,
+                                data
+                            ).forEach(callback)
+                        } catch (e: Exception) {
+                            callback.invoke(
+                                ExtractorLink(
+                                    name,
+                                    name,
+                                    m3u8Url,
+                                    data,
+                                    Qualities.Unknown.value,
+                                    true
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            // Process each iframe
+            iframes.forEach { iframeElement ->
+                val iframeSrc = iframeElement.attr("src")
+                
+                if (iframeSrc.isNotEmpty()) {
+                    val iframeUrl = when {
+                        iframeSrc.startsWith("//") -> "https:$iframeSrc"
+                        iframeSrc.startsWith("/") -> "$mainUrl$iframeSrc"
+                        else -> iframeSrc
+                    }
+                    
+                    // Use loadExtractor for standard extractors
+                    loadExtractor(iframeUrl, data, subtitleCallback, callback)
+                    
+                    // Also try to extract m3u8 directly from iframe
+                    try {
+                        val iframeDoc = app.get(iframeUrl, referer = data)
+                        val iframeHtml = iframeDoc.text
+                        
+                        val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.m3u8[^\s"'<>]*)""")
+                        m3u8Regex.findAll(iframeHtml).forEach { match ->
+                            val m3u8Url = match.groupValues[1].replace("\\/", "/")
+                            
+                            M3u8Helper.generateM3u8(
+                                name,
+                                m3u8Url,
+                                iframeUrl
+                            ).forEach(callback)
+                        }
+                    } catch (e: Exception) {
+                        // Silently fail
+                    }
+                }
+            }
         }
         
         return true
