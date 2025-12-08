@@ -96,12 +96,12 @@ class Tokuzl : MainAPI() {
                             if (title.isNotEmpty() && href.contains(".html")) {
                                 println("Found item $index: '$title' -> $href")
                                 
-                                // Try to find poster
+                                // Try to find poster - FIXED NULL SAFETY HERE
                                 var posterUrl: String? = null
                                 val parent = link.parent() ?: element.parent()
-                                val img = parent.selectFirst("img")
+                                val img = parent?.selectFirst("img")
                                 if (img != null) {
-                                    posterUrl = img.attr("src") ?: img.attr("data-src")
+                                    posterUrl = img.attr("src").ifEmpty { img.attr("data-src") }
                                     println("Found poster: $posterUrl")
                                 }
                                 
