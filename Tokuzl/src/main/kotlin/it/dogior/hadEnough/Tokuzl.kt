@@ -25,204 +25,191 @@ class Tokuzl : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        println("=== TOKUZL DEBUG: getMainPage called ===")
-        println("Request name: ${request.name}")
-        println("Request data: ${request.data}")
-        println("Page: $page")
+        println("=== TOKUZL: getMainPage for ${request.name} page $page ===")
         
         val url = if (page > 1) "${request.data}/page/$page" else request.data
-        println("Fetching URL: $url")
+        println("Fetching: $url")
         
         try {
-            // Try with a longer timeout and different user agent
-            val response = app.get(
-                url, 
-                timeout = 90,
-                headers = mapOf(
-                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                    "Accept-Language" to "en-US,en;q=0.5",
-                    "Accept-Encoding" to "gzip, deflate, br",
-                    "DNT" to "1",
-                    "Connection" to "keep-alive",
-                    "Upgrade-Insecure-Requests" to "1",
-                    "Sec-Fetch-Dest" to "document",
-                    "Sec-Fetch-Mode" to "navigate",
-                    "Sec-Fetch-Site" to "none",
-                    "Sec-Fetch-User" to "?1",
-                    "Cache-Control" to "max-age=0"
-                )
-            )
-            
+            val response = app.get(url, timeout = 30)
             val document = response.document
-            println("Successfully fetched page. Response code: ${response.code}")
+            
+            // For debugging - print page info
+            println("Response code: ${response.code}")
             println("Page title: ${document.title()}")
-            
-            // Debug: Print first 1000 chars of HTML
-            val html = document.html()
-            println("HTML length: ${html.length}")
-            if (html.length > 1000) {
-                println("First 1000 chars of HTML:\n${html.substring(0, 1000)}")
-            }
-            
-            // Try different selectors to find content
-            val selectors = listOf(
-                "article",
-                ".post",
-                ".entry",
-                "h2 a",
-                "h3 a",
-                "h4 a",
-                ".entry-title a",
-                ".post-title a",
-                "a[href*=.html]"
-            )
             
             val home = mutableListOf<SearchResponse>()
             
-            for (selector in selectors) {
-                val elements = document.select(selector)
-                println("Selector '$selector' found ${elements.size} elements")
-                
-                if (elements.isNotEmpty() && home.isEmpty()) {
-                    println("Using selector: $selector")
-                    
-                    elements.take(20).forEachIndexed { index, element ->
-                        val link = if (element.tagName() == "a") element else element.selectFirst("a")
-                        if (link != null) {
-                            val title = link.text().trim()
-                            val href = link.attr("href")
+            // METHOD 1: Look for posts in articles
+            document.select("article, .post, .item-post").forEach { article ->
+                try {
+                    // Get title and link
+                    val titleElement = article.selectFirst("h2 a, h3 a, .entry-title a, .post-title a")
+                    if (titleElement != null) {
+                        val title = titleElement.text().trim()
+                        val href = titleElement.attr("href")
+                        
+                        if (title.isNotEmpty() && href.contains(".html")) {
+                            println("Found: '$title' -> $href")
                             
-                            if (title.isNotEmpty() && href.contains(".html")) {
-                                println("Found item $index: '$title' -> $href")
-                                
-                                // Try to find poster - FIXED NULL SAFETY HERE
-                                var posterUrl: String? = null
-                                val parent = link.parent() ?: element.parent()
-                                val img = parent?.selectFirst("img")
-                                if (img != null) {
-                                    posterUrl = img.attr("src").ifEmpty { img.attr("data-src") }
-                                    println("Found poster: $posterUrl")
+                            // Get image
+                            var posterUrl: String? = null
+                            val img = article.selectFirst("img")
+                            if (img != null) {
+                                posterUrl = img.attr("src").ifEmpty { img.attr("data-src") }
+                                if (posterUrl != null && !posterUrl.startsWith("http")) {
+                                    posterUrl = fixUrl(posterUrl)
                                 }
-                                
-                                home.add(
-                                    newTvSeriesSearchResponse(title, fixUrl(href), TvType.TvSeries) {
-                                        this.posterUrl = posterUrl
-                                    }
-                                )
                             }
+                            
+                            home.add(
+                                newTvSeriesSearchResponse(title, fixUrl(href), TvType.TvSeries) {
+                                    this.posterUrl = posterUrl
+                                }
+                            )
                         }
                     }
+                } catch (e: Exception) {
+                    println("Error parsing article: ${e.message}")
+                }
+            }
+            
+            // METHOD 2: If no articles found, try direct links
+            if (home.isEmpty()) {
+                document.select("a").forEach { link ->
+                    val href = link.attr("href")
+                    val text = link.text().trim()
                     
-                    if (home.isNotEmpty()) {
-                        println("Successfully found ${home.size} items using selector: $selector")
-                        break
+                    if (href.contains("/kamen-rider") || href.contains("/super-sentai") || 
+                        href.contains("/ultraman") || href.contains("/power-ranger")) {
+                        
+                        if (text.isNotEmpty() && href.contains(".html")) {
+                            println("Found direct link: '$text' -> $href")
+                            
+                            home.add(
+                                newTvSeriesSearchResponse(text, fixUrl(href), TvType.TvSeries)
+                            )
+                        }
                     }
                 }
             }
             
-            if (home.isEmpty()) {
-                println("WARNING: No items found with any selector!")
-                // Add a dummy item for testing
-                home.add(
-                    newTvSeriesSearchResponse("Test Item", "$mainUrl/test.html", TvType.TvSeries) {
-                        this.posterUrl = null
-                    }
-                )
-            }
+            // Remove duplicates
+            val uniqueHome = home.distinctBy { it.url }
             
-            val hasNext = document.select("a.next, .next-page, .pagination-next").isNotEmpty()
-            println("Has next page: $hasNext")
+            println("=== TOKUZL: Found ${uniqueHome.size} unique items ===")
             
-            println("=== TOKUZL DEBUG: Returning ${home.size} items ===")
-            
-            return newHomePageResponse(request.name, home, hasNext = hasNext)
+            val hasNext = document.select("a.next, .nav-next, .pagination-next").isNotEmpty()
+            return newHomePageResponse(request.name, uniqueHome, hasNext = hasNext)
             
         } catch (e: Exception) {
-            println("=== TOKUZL DEBUG: ERROR in getMainPage ===")
-            println("Error type: ${e.javaClass.simpleName}")
-            println("Error message: ${e.message}")
-            e.printStackTrace()
-            
-            // Return empty home page with error info
-            return newHomePageResponse(
-                request.name,
-                listOf(
-                    newTvSeriesSearchResponse("ERROR: ${e.message ?: "Unknown error"}", mainUrl, TvType.TvSeries)
-                ),
-                hasNext = false
-            )
+            println("=== TOKUZL ERROR in getMainPage: ${e.message} ===")
+            return newHomePageResponse(request.name, emptyList(), hasNext = false)
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        println("=== TOKUZL DEBUG: search called ===")
-        println("Query: $query")
+        println("=== TOKUZL: Searching for '$query' ===")
         
         val encodedQuery = query.replace(" ", "+")
         val url = "$mainUrl/?s=$encodedQuery"
-        println("Search URL: $url")
         
         try {
-            val document = app.get(url, timeout = 60).document
-            println("Search results found")
+            val document = app.get(url, timeout = 30).document
             
-            return document.select("article").mapNotNull { article ->
-                val link = article.selectFirst("h3 a") ?: return@mapNotNull null
-                val title = link.text().trim()
-                if (title.isEmpty()) return@mapNotNull null
-                
-                val href = fixUrl(link.attr("href"))
-                val posterElement = article.selectFirst("img")
-                val posterUrl = posterElement?.attr("src") ?: posterElement?.attr("data-src")
-                
-                newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
-                    this.posterUrl = posterUrl
+            return document.select("article, .post").mapNotNull { article ->
+                val link = article.selectFirst("h2 a, h3 a, .entry-title a")
+                if (link != null) {
+                    val title = link.text().trim()
+                    val href = link.attr("href")
+                    
+                    if (title.isNotEmpty() && href.contains(".html")) {
+                        val posterElement = article.selectFirst("img")
+                        val posterUrl = posterElement?.attr("src") ?: posterElement?.attr("data-src")
+                        
+                        newTvSeriesSearchResponse(title, fixUrl(href), TvType.TvSeries) {
+                            this.posterUrl = posterUrl?.let { fixUrl(it) }
+                        }
+                    } else {
+                        null
+                    }
+                } else {
+                    null
                 }
             }
         } catch (e: Exception) {
-            println("=== TOKUZL DEBUG: ERROR in search ===")
-            println("Error: ${e.message}")
+            println("=== TOKUZL ERROR in search: ${e.message} ===")
             return emptyList()
         }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        println("=== TOKUZL DEBUG: load called ===")
-        println("URL: $url")
+        println("=== TOKUZL: Loading '$url' ===")
         
         try {
-            val document = app.get(url, timeout = 60).document
+            val document = app.get(url, timeout = 30).document
             
-            val title = document.selectFirst("h1")?.text()?.trim() ?: "Unknown Title"
-            println("Title: $title")
+            val title = document.selectFirst("h1.entry-title, h1.post-title, h1")?.text()?.trim() 
+                ?: "Unknown Title"
             
-            val poster = document.selectFirst("img[src*=.jpg], img[src*=.png], img[src*=.jpeg]")?.attr("src")
-            println("Poster: $poster")
+            val poster = document.selectFirst("img.size-full, img.wp-post-image, img.entry-image")?.attr("src")
+                ?: document.selectFirst("img[src*=.jpg], img[src*=.png]")?.attr("src")
             
-            val episodes = listOf(
-                newEpisode(url) {
-                    this.name = "Episode 1"
-                    this.episode = 1
-                    this.season = 1
+            val plot = document.selectFirst("div.entry-content, article .post-content")?.text()?.trim()
+                ?: "No description available."
+            
+            // Create episodes list
+            val episodes = mutableListOf<Episode>()
+            
+            // Look for episode links
+            document.select("a[href*=.html]").forEach { link ->
+                val href = link.attr("href")
+                val text = link.text().trim().lowercase()
+                
+                if (text.contains("episode") || text.contains("ep") || 
+                    text.matches(Regex("""ep\s*\d+""")) ||
+                    text.matches(Regex("""episode\s*\d+"""))) {
+                    
+                    val epNum = try {
+                        Regex("""\d+""").find(text)?.value?.toIntOrNull() ?: 1
+                    } catch (e: Exception) { 1 }
+                    
+                    episodes.add(
+                        newEpisode(fixUrl(href)) {
+                            this.name = "Episode $epNum"
+                            this.episode = epNum
+                            this.season = 1
+                        }
+                    )
                 }
-            )
+            }
             
-            println("=== TOKUZL DEBUG: Load successful ===")
+            // If no episodes found, use the main page
+            if (episodes.isEmpty()) {
+                episodes.add(
+                    newEpisode(url) {
+                        this.name = "Watch"
+                        this.episode = 1
+                        this.season = 1
+                    }
+                )
+            }
             
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = poster
-                this.plot = "Description will be added soon."
+            val sortedEpisodes = episodes.sortedBy { it.episode }
+            
+            println("=== TOKUZL: Loaded '$title' with ${sortedEpisodes.size} episodes ===")
+            
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, sortedEpisodes) {
+                this.posterUrl = poster?.let { fixUrl(it) }
+                this.plot = plot
             }
             
         } catch (e: Exception) {
-            println("=== TOKUZL DEBUG: ERROR in load ===")
-            println("Error: ${e.message}")
+            println("=== TOKUZL ERROR in load: ${e.message} ===")
             
-            // Return a basic response even if there's an error
+            // Return basic response on error
             return newTvSeriesLoadResponse("Error Loading", url, TvType.TvSeries, emptyList()) {
-                this.posterUrl = null
-                this.plot = "Error loading content: ${e.message}"
+                this.plot = "Error: ${e.message}"
             }
         }
     }
@@ -233,8 +220,10 @@ class Tokuzl : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        println("=== TOKUZL DEBUG: loadLinks called ===")
-        println("Data URL: $data")
+        println("=== TOKUZL: loadLinks for '$data' ===")
+        
+        // Return true to indicate we can handle links
+        // Cloudstream will use UniversalExtractor
         return true
     }
 }
