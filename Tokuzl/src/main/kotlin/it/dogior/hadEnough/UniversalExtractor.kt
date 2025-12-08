@@ -32,21 +32,18 @@ class UniversalExtractor : ExtractorApi() {
         println("UniversalExtractor: Clean URL (no hash): $cleanUrl")
         
         try {
-            // Fetch the page
-            val response = app.get(cleanUrl, referer = referer ?: "", headers = mapOf(
+            // Fetch the page with proper headers
+            val headers = mapOf(
                 "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
                 "Accept-Language" to "en-US,en;q=0.5",
-                "Accept-Encoding" to "gzip, deflate, br",
-                "Referer" to referer ?: "",
+                "Referer" to (referer ?: ""),
                 "DNT" to "1",
                 "Connection" to "keep-alive",
-                "Upgrade-Insecure-Requests" to "1",
-                "Sec-Fetch-Dest" to "document",
-                "Sec-Fetch-Mode" to "navigate",
-                "Sec-Fetch-Site" to "cross-site"
-            ))
+                "Upgrade-Insecure-Requests" to "1"
+            )
             
+            val response = app.get(cleanUrl, referer = referer ?: "", headers = headers)
             val html = response.text
             println("UniversalExtractor: Got HTML, length: ${html.length}")
             
@@ -138,15 +135,17 @@ class UniversalExtractor : ExtractorApi() {
                 println("UniversalExtractor: Processing m3u8 URL: $m3u8Url")
                 try {
                     // Try to generate M3U8 links
+                    val m3u8Headers = mapOf(
+                        "Origin" to getOrigin(cleanUrl),
+                        "Referer" to cleanUrl,
+                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    )
+                    
                     val links = M3u8Helper.generateM3u8(
                         name,
                         m3u8Url,
                         cleanUrl,
-                        headers = mapOf(
-                            "Origin" to getOrigin(cleanUrl),
-                            "Referer" to cleanUrl,
-                            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                        )
+                        headers = m3u8Headers
                     )
                     println("UniversalExtractor: M3u8Helper generated ${links.size} links")
                     links.forEach(callback)
