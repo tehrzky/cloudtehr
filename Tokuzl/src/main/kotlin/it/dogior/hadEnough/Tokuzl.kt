@@ -8,10 +8,7 @@ class Tokuzl : MainAPI() {
     override var name = "Tokuzl"
     override var lang = "en"
     override val hasMainPage = true
-    override val supportedTypes = setOf(
-        TvType.TvSeries,
-        TvType.Movie
-    )
+    override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie)
 
     override val mainPage = mainPageOf(
         "$mainUrl" to "Latest Updates",
@@ -24,158 +21,129 @@ class Tokuzl : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        println("=== TOKUZL: getMainPage for ${request.name} page $page ===")
-        
         val url = if (page > 1) "${request.data}/page/$page" else request.data
-        println("Fetching: $url")
         
         try {
-            val document = app.get(url, timeout = 30).document
+            val document = app.get(url).document
+            val items = mutableListOf<SearchResponse>()
             
-            println("Response code: 200")
-            println("Page title: ${document.title()}")
-            
-            val home = mutableListOf<SearchResponse>()
-            
-            // Try multiple possible selectors for the site structure
-            val selectors = listOf(
-                "div.post-content a[href*=.html]",
-                "div.entry-content a[href*=.html]", 
-                ".post-body a[href*=.html]",
-                "article a[href*=.html]",
-                ".content a[href*=.html]",
-                "a[href*='/20']" // Year-based URLs
+            // Try multiple selectors to find content
+            val contentSelectors = listOf(
+                "div.post-content a",
+                "div.entry-content a", 
+                ".post-body a",
+                "article a",
+                ".content a"
             )
             
-            for (selector in selectors) {
-                val links = document.select(selector)
-                println("Trying selector '$selector': found ${links.size} links")
-                
-                links.forEach { link ->
+            for (selector in contentSelectors) {
+                document.select(selector).forEach { link ->
                     val href = link.attr("href")
                     val text = link.text().trim()
                     
-                    // Filter for actual show links
-                    if (text.isNotEmpty() && 
-                        href.contains(mainUrl) && 
-                        !href.contains("/page/") &&
-                        !href.contains("#") &&
-                        text.length > 5) {
+                    // Only get actual show pages
+                    if (href.isNotEmpty() && 
+                        text.isNotEmpty() && 
+                        href.contains(mainUrl) &&
+                        (href.contains("/kamen-rider/") || 
+                         href.contains("/super-sentai/") || 
+                         href.contains("/ultraman/") ||
+                         href.contains("/power-ranger/") ||
+                         href.contains("/garo/") ||
+                         href.contains("/metal-heroes/")) &&
+                        !href.contains("/page/")) {
                         
-                        // Try to find associated image
-                        var posterUrl: String? = null
+                        // Get poster from nearby img
+                        var poster: String? = null
                         val parent = link.parent()
-                        if (parent != null) {
-                            val img = parent.selectFirst("img")
-                            if (img != null) {
-                                posterUrl = img.attr("src")
-                                    .ifEmpty { img.attr("data-src") }
-                                    .ifEmpty { img.attr("data-lazy-src") }
-                                if (!posterUrl.isNullOrEmpty() && !posterUrl.startsWith("http")) {
-                                    posterUrl = fixUrl(posterUrl)
-                                }
+                        parent?.let {
+                            val img = it.selectFirst("img")
+                            poster = img?.attr("src") ?: img?.attr("data-src")
+                            if (!poster.isNullOrEmpty() && !poster!!.startsWith("http")) {
+                                poster = fixUrl(poster!!)
                             }
                         }
                         
-                        home.add(
+                        items.add(
                             newTvSeriesSearchResponse(text, fixUrl(href), TvType.TvSeries) {
-                                this.posterUrl = posterUrl
+                                this.posterUrl = poster
                             }
                         )
                     }
                 }
                 
-                if (home.isNotEmpty()) break // Stop if we found content
+                if (items.isNotEmpty()) break
             }
             
-            val uniqueHome = home.distinctBy { it.url }
-            println("=== TOKUZL: Found ${uniqueHome.size} unique items ===")
-            
-            val hasNext = document.select("a.next, .nav-next, a[rel=next]").isNotEmpty()
-            return newHomePageResponse(request.name, uniqueHome, hasNext = hasNext)
+            return newHomePageResponse(
+                request.name, 
+                items.distinctBy { it.url }, 
+                hasNext = document.select("a.next, .nav-next").isNotEmpty()
+            )
             
         } catch (e: Exception) {
-            println("=== TOKUZL ERROR in getMainPage: ${e.message} ===")
-            e.printStackTrace()
             return newHomePageResponse(request.name, emptyList(), hasNext = false)
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        println("=== TOKUZL: Searching for '$query' ===")
-        
-        val url = "$mainUrl/?s=${query.replace(" ", "+")}"
-        
-        try {
-            val document = app.get(url, timeout = 30).document
+        return try {
+            val document = app.get("$mainUrl/?s=${query.replace(" ", "+")}").document
             
-            return document.select("a[href*=.html]").mapNotNull { link ->
+            document.select("a").mapNotNull { link ->
                 val href = link.attr("href")
                 val title = link.text().trim()
                 
-                if (title.isNotEmpty() && href.contains(mainUrl) && title.length > 5) {
-                    val posterElement = link.parent()?.selectFirst("img")
-                    val posterUrl = posterElement?.attr("src") 
-                        ?: posterElement?.attr("data-src")
+                if (title.isNotEmpty() && 
+                    href.contains(mainUrl) && 
+                    title.length > 3 &&
+                    (href.contains("/kamen-rider/") || 
+                     href.contains("/super-sentai/") || 
+                     href.contains("/ultraman/") ||
+                     href.contains("/power-ranger/") ||
+                     href.contains("/garo/") ||
+                     href.contains("/metal-heroes/"))) {
+                    
+                    val poster = link.parent()?.selectFirst("img")?.attr("src")
                     
                     newTvSeriesSearchResponse(title, fixUrl(href), TvType.TvSeries) {
-                        this.posterUrl = posterUrl?.let { fixUrl(it) }
+                        this.posterUrl = poster?.let { fixUrl(it) }
                     }
                 } else null
             }.distinctBy { it.url }
         } catch (e: Exception) {
-            println("=== TOKUZL ERROR in search: ${e.message} ===")
-            return emptyList()
+            emptyList()
         }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        println("=== TOKUZL: Loading '$url' ===")
+        val document = app.get(url).document
         
-        try {
-            val document = app.get(url, timeout = 30).document
-            
-            val title = document.selectFirst("h1, .entry-title, .post-title")?.text()?.trim() 
-                ?: "Unknown Title"
-            
-            val poster = document.selectFirst("img[src*=.jpg], img[src*=.png]")?.attr("src")
-            
-            val plot = document.selectFirst(".entry-content, .post-content")?.text()?.trim()
-                ?: "No description available."
-            
-            val episodes = mutableListOf<Episode>()
-            
-            // Find video iframes or links in the page
-            document.select("iframe[src], a[href*='.mp4'], a[href*='.m3u8']").forEachIndexed { index, element ->
-                val href = element.attr("src").ifEmpty { element.attr("href") }
-                if (href.isNotEmpty()) {
-                    episodes.add(
-                        newEpisode(fixUrl(href)) {
-                            this.name = "Episode ${index + 1}"
-                            this.episode = index + 1
-                        }
-                    )
-                }
-            }
-            
-            // If no videos, use the page itself
-            if (episodes.isEmpty()) {
-                episodes.add(newEpisode(url) {
-                    this.name = "Watch"
-                    this.episode = 1
-                })
-            }
-            
-            println("=== TOKUZL: Loaded '$title' with ${episodes.size} episodes ===")
-            
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = poster?.let { fixUrl(it) }
-                this.plot = plot
-            }
-            
-        } catch (e: Exception) {
-            println("=== TOKUZL ERROR in load: ${e.message} ===")
-            return newTvSeriesLoadResponse("Error", url, TvType.TvSeries, emptyList())
+        val title = document.selectFirst("h1")?.text()?.trim() ?: "Unknown"
+        val poster = document.selectFirst("img")?.attr("src")
+        val description = document.selectFirst(".entry-content p, .post-content p")?.text()
+        
+        val episodes = mutableListOf<Episode>()
+        
+        // Find all iframes and video sources
+        document.select("iframe[src]").forEachIndexed { index, iframe ->
+            episodes.add(newEpisode(fixUrl(iframe.attr("src"))) {
+                this.name = "Episode ${index + 1}"
+                this.episode = index + 1
+            })
+        }
+        
+        // If no iframes, just use the page URL
+        if (episodes.isEmpty()) {
+            episodes.add(newEpisode(url) {
+                this.name = "Watch"
+                this.episode = 1
+            })
+        }
+        
+        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+            this.posterUrl = poster?.let { fixUrl(it) }
+            this.plot = description
         }
     }
 
@@ -185,50 +153,41 @@ class Tokuzl : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        println("=== TOKUZL: loadLinks for '$data' ===")
-        
-        try {
-            // Try direct video URL first
-            if (data.contains(".mp4") || data.contains(".m3u8")) {
-                callback.invoke(
-                    ExtractorLink(
-                        source = name,
-                        name = "Direct",
-                        url = data,
-                        referer = mainUrl,
-                        quality = Qualities.Unknown.value
-                    )
+        // Handle direct video URLs
+        if (data.contains(".mp4") || data.contains(".m3u8")) {
+            callback.invoke(
+                newExtractorLink(
+                    source = name,
+                    name = "Direct",
+                    url = data,
+                    referer = mainUrl,
+                    quality = Qualities.Unknown.value
                 )
-                return true
-            }
-            
-            // Fetch page and extract sources
-            val document = app.get(data).document
-            
-            // Extract from iframes
-            document.select("iframe[src]").forEach { iframe ->
-                val src = iframe.attr("src")
-                loadExtractor(fixUrl(src), subtitleCallback, callback)
-            }
-            
-            // Extract from video tags
-            document.select("video source[src]").forEach { source ->
-                val src = source.attr("src")
-                callback.invoke(
-                    ExtractorLink(
-                        source = name,
-                        name = "Video",
-                        url = fixUrl(src),
-                        referer = data,
-                        quality = Qualities.Unknown.value
-                    )
-                )
-            }
-            
+            )
             return true
-        } catch (e: Exception) {
-            println("=== TOKUZL ERROR: ${e.message} ===")
-            return false
         }
+        
+        // Load the page and extract sources
+        val document = app.get(data).document
+        
+        // Extract iframes
+        document.select("iframe[src]").forEach { iframe ->
+            loadExtractor(fixUrl(iframe.attr("src")), subtitleCallback, callback)
+        }
+        
+        // Extract video tags
+        document.select("video source[src]").forEach { source ->
+            callback.invoke(
+                newExtractorLink(
+                    source = name,
+                    name = "Video",
+                    url = fixUrl(source.attr("src")),
+                    referer = data,
+                    quality = Qualities.Unknown.value
+                )
+            )
+        }
+        
+        return true
     }
 }
