@@ -8,6 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class TokuzlPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(Tokuzl())
-        registerExtractorAPI(P2PPlayExtractor())
+        registerExtractorAPI(UniversalExtractor())
     }
 }
