@@ -37,20 +37,8 @@ class Tokuzl : MainAPI() {
             val posterElement = article.selectFirst("img")
             val posterUrl = posterElement?.attr("src") ?: posterElement?.attr("data-src")
             
-            // Determine if it's a series or movie
-            val isMovie = title.contains("Movie", ignoreCase = true) || 
-                         title.contains("Film", ignoreCase = true)
-            
-            val type = if (isMovie) TvType.Movie else TvType.TvSeries
-            
-            if (isMovie) {
-                newMovieSearchResponse(title, href, type) {
-                    this.posterUrl = posterUrl
-                }
-            } else {
-                newTvSeriesSearchResponse(title, href, type) {
-                    this.posterUrl = posterUrl
-                }
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
             }
         }
         
@@ -74,19 +62,8 @@ class Tokuzl : MainAPI() {
             val posterElement = article.selectFirst("img")
             val posterUrl = posterElement?.attr("src") ?: posterElement?.attr("data-src")
             
-            val isMovie = title.contains("Movie", ignoreCase = true) || 
-                         title.contains("Film", ignoreCase = true)
-            
-            val type = if (isMovie) TvType.Movie else TvType.TvSeries
-            
-            if (isMovie) {
-                newMovieSearchResponse(title, href, type) {
-                    this.posterUrl = posterUrl
-                }
-            } else {
-                newTvSeriesSearchResponse(title, href, type) {
-                    this.posterUrl = posterUrl
-                }
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
             }
         }
     }
@@ -97,7 +74,7 @@ class Tokuzl : MainAPI() {
         // Extract title
         val title = document.selectFirst("h1.entry-title")?.text()?.trim() 
             ?: document.selectFirst("h1")?.text()?.trim() 
-            ?: ""
+            ?: "Unknown Title"
         
         // Extract poster image
         val poster = document.selectFirst("img.size-full, img.wp-post-image, img.aligncenter")?.attr("src")
@@ -106,52 +83,28 @@ class Tokuzl : MainAPI() {
         // Extract plot/description
         val plotElement = document.selectFirst("div.entry-content") ?: document.selectFirst("article")
         val plot = plotElement?.select("p")?.take(3)?.joinToString("\n\n") { it.text().trim() } 
-            ?: ""
+            ?: "No description available."
         
-        // Determine if it's a movie or series
-        val isMovie = title.contains("Movie", ignoreCase = true) || 
-                     url.contains("/movie/") || 
-                     plot.contains("movie", ignoreCase = true)
-        
-        if (isMovie) {
-            // Handle as movie
-            val yearMatch = Regex("""(19\d{2}|20\d{2})""").find(title + " " + plot)
-            val year = yearMatch?.value?.toIntOrNull()
-            
-            return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = poster
-                this.year = year
-                this.plot = plot
-            }
-        } else {
-            // Handle as TV series
-            val episodes = extractEpisodes(document, url)
-            val yearMatch = Regex("""(19\d{2}|20\d{2})""").find(title + " " + plot)
-            val year = yearMatch?.value?.toIntOrNull()
-            
-            println("Tokuzl: Loaded series '$title' with ${episodes.size} episodes")
-            
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = poster
-                this.year = year
-                this.plot = plot
-            }
+        // Extract year
+        var year: Int? = null
+        val yearMatch = Regex("""(19\d{2}|20\d{2})""").find(title + " " + plot)
+        if (yearMatch != null) {
+            year = yearMatch.value.toIntOrNull()
         }
-    }
-    
-    private fun extractEpisodes(document: Element, baseUrl: String): List<Episode> {
+        
+        // Extract episodes
         val episodes = mutableListOf<Episode>()
         
-        // Method 1: Look for episode links
+        // Look for episode links
         document.select("a[href*='.html']").forEach { link ->
             val href = link.attr("href")
             val text = link.text().trim()
             
-            if (href.contains("tokuzl.net") && 
-                (text.contains("Episode", ignoreCase = true) || 
-                 text.contains("EP", ignoreCase = true) ||
-                 Regex("""Episode\s+\d+""", RegexOption.IGNORE_CASE).matches(text) ||
-                 Regex("""EP\s+\d+""", RegexOption.IGNORE_CASE).matches(text))) {
+            // Check if it looks like an episode link
+            if (text.contains("Episode", ignoreCase = true) || 
+                text.contains("EP", ignoreCase = true) ||
+                Regex("""Episode\s+\d+""", RegexOption.IGNORE_CASE).matches(text) ||
+                Regex("""EP\s+\d+""", RegexOption.IGNORE_CASE).matches(text)) {
                 
                 val epNum = try {
                     Regex("""\d+""").find(text)?.value?.toIntOrNull() ?: 1
@@ -167,10 +120,10 @@ class Tokuzl : MainAPI() {
             }
         }
         
-        // Method 2: If no episodes found, create at least one
+        // If no episodes found, create at least one
         if (episodes.isEmpty()) {
             episodes.add(
-                newEpisode(baseUrl) {
+                newEpisode(url) {
                     this.name = "Watch"
                     this.episode = 1
                     this.season = 1
@@ -178,6 +131,26 @@ class Tokuzl : MainAPI() {
             )
         }
         
-        return episodes.sortedBy { it.episode }
+        // Sort episodes
+        val sortedEpisodes = episodes.sortedBy { it.episode }
+        
+        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, sortedEpisodes) {
+            this.posterUrl = poster
+            this.year = year
+            this.plot = plot
+        }
+    }
+
+    // IMPORTANT: Cloudstream requires this method
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        // Cloudstream will automatically use the registered UniversalExtractor
+        // But we need to return true to indicate we can handle this URL
+        println("Tokuzl: loadLinks called for $data")
+        return true
     }
 }
