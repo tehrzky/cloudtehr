@@ -97,41 +97,24 @@ class Tokuzl : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         
-        // First check for direct m3u8 in scripts
-        val scripts = document.select("script")
-        scripts.forEach { script ->
-            val content = script.data()
-            if (content.contains("m3u8")) {
-                val m3u8Regex = Regex("""["'](https?://[^"']+\.m3u8(?:\?[^"']*)?)["']""")
-                m3u8Regex.findAll(content).forEach { match ->
-                    val m3u8Url = match.groupValues[1].replace("\\/", "/")
-                    
-                    callback.invoke(
-                        newExtractorLink(
-                            source = name,
-                            name = name,
-                            url = m3u8Url,
-                            type = ExtractorLinkType.M3U8
-                        ) {
-                            this.referer = data
-                        }
-                    )
-                    return true
-                }
-            }
-        }
+        println("Tokuzl DEBUG: Loading links from: $data")
         
         // Look for iframes
         val iframes = document.select("iframe")
+        println("Tokuzl DEBUG: Found ${iframes.size} iframes")
         
-        iframes.forEach { iframe ->
-            val iframeSrc = iframe.attr("src")
-            if (iframeSrc.isNotEmpty()) {
+        iframes.forEachIndexed { index, iframe ->
+            val src = iframe.attr("src")
+            println("Tokuzl DEBUG: Iframe $index src: $src")
+            
+            if (src.isNotEmpty()) {
                 val iframeUrl = when {
-                    iframeSrc.startsWith("//") -> "https:$iframeSrc"
-                    iframeSrc.startsWith("/") -> "$mainUrl$iframeSrc"
-                    else -> iframeSrc
+                    src.startsWith("//") -> "https:$src"
+                    src.startsWith("/") -> "$mainUrl$src"
+                    else -> src
                 }
+                
+                println("Tokuzl DEBUG: Processing iframe URL: $iframeUrl")
                 
                 callback.invoke(
                     newExtractorLink(
@@ -146,6 +129,7 @@ class Tokuzl : MainAPI() {
             }
         }
         
+        println("Tokuzl DEBUG: No iframes found")
         return false
     }
 }
