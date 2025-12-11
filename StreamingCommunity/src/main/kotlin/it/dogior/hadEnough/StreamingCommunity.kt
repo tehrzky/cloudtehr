@@ -49,7 +49,7 @@ class StreamingCommunity : MainAPI() {
             "X-Inertia-Version" to inertiaVersion,
             "X-Requested-With" to "XMLHttpRequest",
         ).toMutableMap()
-        val mainUrl = "https://streamingunity.co/en"  // Changed to English version
+        val mainUrl = "https://streamingunity.so/en"  // Changed to English version
         var name = "StreamingCommunity"
         val TAG = "SCommunity"
     }
