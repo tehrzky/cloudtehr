@@ -50,7 +50,7 @@ class StreamingCommunity : MainAPI() {
             "X-Requested-With" to "XMLHttpRequest",
         ).toMutableMap()
         val mainUrl = "https://streamingunity.so/en"  // Changed to English version
-        var name = "StreamingCommunity"
+        var name = "StreamingCommunity En"
         val TAG = "SCommunity"
     }
 
