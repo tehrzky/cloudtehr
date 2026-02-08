@@ -16,70 +16,94 @@ class RapidShareExtractor : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(
-        url: String,
-        referer: String?,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        try {
-            val rapidUrl = url.toHttpUrl()
-            val token = rapidUrl.pathSegments.last()
-            val subtitleUrl = rapidUrl.queryParameter("sub.list")
-            val baseUrl = "${rapidUrl.scheme}://${rapidUrl.host}"
-            val mediaUrl = "$baseUrl/media/$token"
+    url: String,
+    referer: String?,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+) {
+    println("RapidShare DEBUG - Starting extraction for URL: $url")
+    
+    try {
+        val rapidUrl = url.toHttpUrl()
+        val token = rapidUrl.pathSegments.last()
+        val subtitleUrl = rapidUrl.queryParameter("sub.list")
+        val baseUrl = "${rapidUrl.scheme}://${rapidUrl.host}"
+        val mediaUrl = "$baseUrl/media/$token"
 
-            // Get encrypted response
-            val encryptedResponse = app.get(mediaUrl).text
-            val encryptedData = parseJson<EncryptedRapidResponse>(encryptedResponse)
+        println("RapidShare DEBUG - Token: $token")
+        println("RapidShare DEBUG - Base URL: $baseUrl")
+        println("RapidShare DEBUG - Media URL: $mediaUrl")
 
-            // Decrypt the response
-            val decryptionBody = JSONObject().apply {
-                put("text", encryptedData.result)
-                put("agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36")
-            }.toString()
+        // Get encrypted response
+        val encryptedResponse = app.get(mediaUrl).text
+        println("RapidShare DEBUG - Encrypted response: $encryptedResponse")
+        
+        val encryptedData = parseJson<EncryptedRapidResponse>(encryptedResponse)
+        println("RapidShare DEBUG - Encrypted data result: ${encryptedData.result}")
 
-            val decryptedResponse = app.post(
-                "https://enc-dec.app/api/dec-rapid",
-                requestBody = decryptionBody.toRequestBody("application/json".toMediaType())
-            ).text
+        // Decrypt the response
+        val decryptionBody = JSONObject().apply {
+            put("text", encryptedData.result)
+            put("agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36")
+        }.toString()
 
-            val rapidResult = parseJson<RapidDecryptResponse>(decryptedResponse).result
+        println("RapidShare DEBUG - Decryption body: $decryptionBody")
 
-            // Handle subtitles
-            val subtitles = if (subtitleUrl != null) {
-                try {
-                    val subResponse = app.get(subtitleUrl, headers = mapOf("Origin" to baseUrl)).text
-                    parseJson<List<RapidShareTrack>>(subResponse)
-                        .filter { it.kind == "captions" && it.file.isNotBlank() && it.label != null }
-                        .map { SubtitleFile(it.label!!, it.file) }
-                } catch (e: Exception) {
-                    emptyList()
-                }
-            } else {
-                rapidResult.tracks
+        val decryptedResponse = app.post(
+            "https://enc-dec.app/api/dec-rapid",
+            requestBody = decryptionBody.toRequestBody("application/json".toMediaType())
+        ).text
+
+        println("RapidShare DEBUG - Decrypted response: $decryptedResponse")
+
+        val rapidResult = parseJson<RapidDecryptResponse>(decryptedResponse).result
+
+        println("RapidShare DEBUG - Found ${rapidResult.sources.size} sources")
+        println("RapidShare DEBUG - Found ${rapidResult.tracks.size} tracks")
+
+        // Handle subtitles
+        val subtitles = if (subtitleUrl != null) {
+            println("RapidShare DEBUG - Fetching subtitles from: $subtitleUrl")
+            try {
+                val subResponse = app.get(subtitleUrl, headers = mapOf("Origin" to baseUrl)).text
+                parseJson<List<RapidShareTrack>>(subResponse)
                     .filter { it.kind == "captions" && it.file.isNotBlank() && it.label != null }
                     .map { SubtitleFile(it.label!!, it.file) }
+            } catch (e: Exception) {
+                println("RapidShare DEBUG - Error fetching subtitles: ${e.message}")
+                emptyList()
             }
-
-            subtitles.forEach(subtitleCallback)
-
-            // Extract video sources
-            rapidResult.sources.forEach { source ->
-                val videoUrl = source.file
-                if (videoUrl.contains(".m3u8")) {
-                    M3u8Helper.generateM3u8(
-                        name,
-                        videoUrl,
-                        referer = "$baseUrl/",
-                        headers = mapOf("Origin" to baseUrl)
-                    ).forEach(callback)
-                }
-            }
-
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } else {
+            rapidResult.tracks
+                .filter { it.kind == "captions" && it.file.isNotBlank() && it.label != null }
+                .map { SubtitleFile(it.label!!, it.file) }
         }
+
+        println("RapidShare DEBUG - Found ${subtitles.size} subtitles")
+        subtitles.forEach(subtitleCallback)
+
+        // Extract video sources
+        rapidResult.sources.forEach { source ->
+            val videoUrl = source.file
+            println("RapidShare DEBUG - Processing source: $videoUrl")
+            
+            if (videoUrl.contains(".m3u8")) {
+                val m3u8Links = M3u8Helper.generateM3u8(
+                    name,
+                    videoUrl,
+                    referer = "$baseUrl/",
+                    headers = mapOf("Origin" to baseUrl)
+                )
+                println("RapidShare DEBUG - Generated ${m3u8Links.size} M3U8 links")
+                m3u8Links.forEach(callback)
+            }
+        }
+
+    } catch (e: Exception) {
+        println("RapidShare DEBUG - Error: ${e.message}")
+        e.printStackTrace()
     }
+}
 
     @Serializable
     data class EncryptedRapidResponse(
