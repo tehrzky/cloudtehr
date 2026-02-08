@@ -176,6 +176,7 @@ class StreamingCommunity(
         )
     }
 
+    // FIXED SEARCH FUNCTION
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "$mainUrl/search"
         val params = mapOf("q" to query)
@@ -183,22 +184,56 @@ class StreamingCommunity(
         if (headers["Cookie"].isNullOrEmpty()) {
             setupHeaders()
         }
-        val response = app.get(url, params = params, headers = headers).body.string()
-        val result = parseJson<InertiaResponse>(response)
-
-        return searchResponseBuilder(result.props.titles!!)
+        
+        try {
+            val response = app.get(url, params = params, headers = headers)
+            val responseBody = response.body.string()
+            
+            // Try to parse the response
+            val result = parseJson<InertiaResponse>(responseBody)
+            
+            // Check if we have titles in the response
+            return if (result.props.titles != null && result.props.titles.isNotEmpty()) {
+                searchResponseBuilder(result.props.titles)
+            } else {
+                // If no titles in first response, try the paginated search API
+                search(query, 1).list
+            }
+        } catch (e: Exception) {
+            // Fallback to paginated search if simple search fails
+            return search(query, 1).list
+        }
     }
 
+    // FIXED PAGINATED SEARCH FUNCTION
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val searchUrl = "${mainUrl.replace("/it", "")}/api/search"
+        val searchUrl = "${mainUrl.replace("/it", "").replace("/en", "")}/api/search"
         val params = mutableMapOf("q" to query, "lang" to lang)
+        
         if (page > 0) {
             params["offset"] = ((page - 1) * 60).toString()
         }
-        val response = app.get(searchUrl, params = params, headers = headers).body.string()
-        val result = parseJson<it.dogior.hadEnough.SearchResponse>(response)
-        val hasNext = (page < 3) || (page < result.lastPage)
-        return newSearchResponseList(searchResponseBuilder(result.data), hasNext = hasNext)
+        
+        if (headers["Cookie"].isNullOrEmpty()) {
+            setupHeaders()
+        }
+        
+        val response = app.get(searchUrl, params = params, headers = headers)
+        val responseBody = response.body.string()
+        
+        try {
+            // Parse the search response
+            val result = parseJson<SearchResponseData>(responseBody)
+            
+            // Use the data field from the response
+            val titles = result.data ?: emptyList()
+            val hasNext = (page < 3) || (page < (result.lastPage ?: 1))
+            
+            return newSearchResponseList(searchResponseBuilder(titles), hasNext = hasNext)
+        } catch (e: Exception) {
+            Log.d(TAG, "Search error: ${e.message}")
+            return newSearchResponseList(emptyList(), hasNext = false)
+        }
     }
 
     private suspend fun getPoster(title: TitleProp): String? {
@@ -484,3 +519,11 @@ class StreamingCommunity(
         return true
     }
 }
+
+// ADD THIS DATA CLASS FOR SEARCH RESPONSE
+private data class SearchResponseData(
+    val data: List<Title>? = null,
+    val lastPage: Int? = null,
+    val currentPage: Int? = null,
+    val total: Int? = null
+)
