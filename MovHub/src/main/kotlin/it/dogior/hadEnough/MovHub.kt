@@ -208,6 +208,7 @@ class MovHub : MainAPI() {
                     val episodeUrl = episode.selectFirst("a")?.attr("href") ?: ""
                     val episodePlot = episode.selectFirst(".plot, .description")?.text() ?: ""
                     
+                    // FIXED: Properly use newEpisode with builder lambda
                     episodes.add(
                         newEpisode(episodeUrl) {
                             this.name = episodeTitle
