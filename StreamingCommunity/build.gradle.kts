@@ -7,7 +7,7 @@ version = 41
 cloudstream {
     // All of these properties are optional, you can safely remove them
 
-    description = "Film e SerieTV da StreamingCommunity"
+    description = "StreamingCommunity"
     authors = listOf("doGior","DieGon")
 
     /**
@@ -26,7 +26,7 @@ cloudstream {
     )
 
     requiresResources = true
-    language = "it"
+    language = "en"
 
     iconUrl = "https://raw.githubusercontent.com/DieGon7771/ItaliaInStreaming/master/StreamingCommunity/streamingunity_icon.png"
 }
