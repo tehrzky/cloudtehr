@@ -3,8 +3,8 @@ package it.dogior.hadEnough
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -14,11 +14,6 @@ class RapidShareExtractor : ExtractorApi() {
     override val mainUrl = "https://movhub.to"
     override val name = "RapidShare"
     override val requiresReferer = true
-
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
 
     override suspend fun getUrl(
         url: String,
