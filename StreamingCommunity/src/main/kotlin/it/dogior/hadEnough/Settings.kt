@@ -92,7 +92,7 @@ class Settings(
 
         
         val langsDropdown: Spinner? = view.findViewByName("lang_spinner")
-        val langs = arrayOf("it", "en")
+        val langs = arrayOf("en")
         val langsMap = langs.map { it to getString(it) }
         langsDropdown?.adapter = ArrayAdapter(
             requireContext(), android.R.layout.simple_spinner_dropdown_item, langsMap.map { it.second }
