@@ -1,24 +1,16 @@
 package it.dogior.hadEnough
 
+import android.util.Log
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.AppUtils.parseJson
-import com.lagradost.cloudstream3.utils.AppUtils.toJson
-import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.*
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 
 /**
  * CloudStream source for https://movhub.to
- *
- * Keeps the original package name (it.dogior.hadEnough) so you can
- * drop the file straight into a repository that already contains the
- * Android UI code – the two parts will not clash because they are
- * compiled in different modules.
  */
 class MovHub(
-    /** MovHub only offers English, but we keep the parameter for compatibility */
     override var lang: String = "en",
-    /** Show a TMDB logo next to the title if a TMDB id exists */
     private val showLogo: Boolean = true
 ) : MainAPI() {
 
@@ -83,7 +75,7 @@ class MovHub(
     override val mainPage = sections
 
     // -----------------------------------------------------------------
-    // 5️⃣ Helper – obtain the cookie and X‑Inertia‑Version header
+    // 4️⃣ Helper – obtain the cookie and X‑Inertia‑Version header
     // -----------------------------------------------------------------
     private suspend fun setupHeaders() {
         val resp = app.get("$mainUrl/archive")
@@ -102,7 +94,7 @@ class MovHub(
     }
 
     // -----------------------------------------------------------------
-    // 6️⃣ Convert raw MovHub titles into CloudStream SearchResponse objects
+    // 5️⃣ Convert raw MovHub titles into CloudStream SearchResponse objects
     // -----------------------------------------------------------------
     private fun buildSearchResponses(titles: List<MovHubTitle>): List<SearchResponse> {
         val domain = mainUrl.substringAfter("://").substringBeforeLast("/")
@@ -121,7 +113,7 @@ class MovHub(
     }
 
     // -----------------------------------------------------------------
-    // 7️⃣ Home‑page pagination
+    // 6️⃣ Home‑page pagination
     // -----------------------------------------------------------------
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         // Build the API endpoint – everything lives under /api
@@ -144,7 +136,7 @@ class MovHub(
         }
 
         val resp = app.get(url, params = params)
-        val json = parseJson<MovHubSection>(resp.body.string())
+        val json = parseJson<MovHubSection>(resp.text)
         val list = buildSearchResponses(json.titles)
 
         // Continue while we receive a full page (60 items)
@@ -160,7 +152,7 @@ class MovHub(
     }
 
     // -----------------------------------------------------------------
-    // 8️⃣ Simple (non‑paginated) search
+    // 7️⃣ Simple (non‑paginated) search
     // -----------------------------------------------------------------
     override suspend fun search(query: String): List<SearchResponse> {
         if (headers["Cookie"].isNullOrEmpty()) setupHeaders()
@@ -168,14 +160,14 @@ class MovHub(
             "${mainUrl}search",
             params = mapOf("q" to query),
             headers = headers
-        ).body.string()
+        ).text
 
         val result = parseJson<MovHubInertiaResponse>(resp)
         return buildSearchResponses(result.props.titles ?: emptyList())
     }
 
     // -----------------------------------------------------------------
-    // 9️⃣ Paginated search (used by CloudStream when the user scrolls)
+    // 8️⃣ Paginated search (used by CloudStream when the user scrolls)
     // -----------------------------------------------------------------
     override suspend fun search(query: String, page: Int): SearchResponseList {
         if (headers["Cookie"].isNullOrEmpty()) setupHeaders()
@@ -188,7 +180,7 @@ class MovHub(
             params["offset"] = ((page - 1) * 60).toString()
         }
 
-        val resp = app.get(url, params = params, headers = headers).body.string()
+        val resp = app.get(url, params = params, headers = headers).text
         val result = parseJson<MovHubSearchResponse>(resp)
 
         val hasNext = (page < 3) || (page < result.lastPage)
@@ -196,7 +188,7 @@ class MovHub(
     }
 
     // -----------------------------------------------------------------
-    // 10️⃣ Helper – fetch a poster (TMDB fallback if possible)
+    // 9️⃣ Helper – fetch a poster (TMDB fallback if possible)
     // -----------------------------------------------------------------
     private suspend fun fetchPoster(title: MovHubTitleProp): String? {
         return if (title.tmdbId != null) {
@@ -212,7 +204,7 @@ class MovHub(
     }
 
     // -----------------------------------------------------------------
-    // 11️⃣ Fetch TMDB logo (optional, shown next to the title)
+    // 🔟 Fetch TMDB logo (optional, shown next to the title)
     // -----------------------------------------------------------------
     private suspend fun fetchTmdbLogoUrl(
         type: TvType,
@@ -229,7 +221,7 @@ class MovHub(
             }
             val resp = app.get(endpoint, headers = tmdbHeaders)
             if (!resp.isSuccessful) return null
-            val json = JSONObject(resp.body?.string() ?: return null)
+            val json = JSONObject(resp.text)
             val logos = json.optJSONArray("logos") ?: return null
             if (logos.length() == 0) return null
 
@@ -268,12 +260,12 @@ class MovHub(
     }
 
     // -----------------------------------------------------------------
-    // 12️⃣ Load a title (movie or series) – builds the detailed page
+    // 11️⃣ Load a title (movie or series) – builds the detailed page
     // -----------------------------------------------------------------
     override suspend fun load(url: String): LoadResponse {
         if (headers["Cookie"].isNullOrEmpty()) setupHeaders()
         val resp = app.get(url, headers = headers)
-        val json = parseJson<MovHubInertiaResponse>(resp.body.string()).props
+        val json = parseJson<MovHubInertiaResponse>(resp.text).props
         val title = json.title!!
 
         val domain = mainUrl.substringAfter("://").substringBeforeLast("/")
@@ -312,7 +304,7 @@ class MovHub(
                 title.imdbId?.let { addImdbId(it) }
                 title.tmdbId?.let { addTMDbId(it.toString()) }
                 addActors(title.mainActors?.map { it.name })
-                addScore(title.score)
+                addScore(title.score ?: 0)
                 trailers?.takeIf { it.isNotEmpty() }?.let { addTrailer(it) }
             }
         }
@@ -340,7 +332,7 @@ class MovHub(
             title.age?.let { contentRating = "$it+" }
             recommendations = json.sliders?.firstOrNull()?.titles?.let { buildSearchResponses(it) }
             addActors(title.mainActors?.map { it.name })
-            addScore(title.score)
+            addScore(title.score ?: 0)
             title.imdbId?.let { addImdbId(it) }
             title.tmdbId?.let { addTMDbId(it.toString()) }
             title.runtime?.let { duration = it }
@@ -349,7 +341,7 @@ class MovHub(
     }
 
     // -----------------------------------------------------------------
-    // 13️⃣ Build the episode list for a TV series
+    // 12️⃣ Build the episode list for a TV series
     // -----------------------------------------------------------------
     private suspend fun getEpisodes(props: Props): List<Episode> {
         val episodeList = mutableListOf<Episode>()
@@ -364,4 +356,172 @@ class MovHub(
                 if (inertiaVersion.isEmpty()) setupHeaders()
                 val seasonUrl = "$mainUrl/titles/${title.id}-${title.slug}/season-${season.number}"
                 val resp = app.get(seasonUrl, headers = headers)
-                parseJson<MovHubInertiaResponse>(resp.body.string()).props.loaded
+                val response = parseJson<MovHubInertiaResponse>(resp.text)
+                response.props.loadedSeason?.episodes ?: emptyList()
+            }
+
+            rawEpisodes.forEach { episode ->
+                episodeList.add(
+                    newEpisode("$mainUrl/iframe/${episode.id}") {
+                        this.name = "Episode ${episode.number}"
+                        this.season = season.number
+                        this.episode = episode.number
+                        episode.name?.let { this.title = it }
+                        episode.poster?.let { posterId ->
+                            val domain = mainUrl.substringAfter("://").substringBeforeLast("/")
+                            this.posterUrl = "https://cdn.$domain/images/$posterId"
+                        }
+                        episode.description?.let { this.description = it }
+                        episode.released?.let { this.date = it }
+                        episode.runtime?.let { this.duration = it }
+                    }
+                )
+            }
+        }
+
+        return episodeList
+    }
+
+    // -----------------------------------------------------------------
+    // 13️⃣ Load video links
+    // -----------------------------------------------------------------
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        return try {
+            val loadData = parseJson<LoadData>(data)
+            val url = loadData.url
+            
+            // Extract token from URL
+            val httpUrl = url.toHttpUrl()
+            val token = httpUrl.queryParameter("token") ?: 
+                        httpUrl.pathSegments.lastOrNull { it.isNotEmpty() } ?: 
+                        return false
+            
+            // Construct rapidshare URL
+            val rapidUrl = "https://movhub.to/media/$token"
+            
+            // Use RapidShare extractor
+            RapidShareExtractor().getUrl(
+                url = rapidUrl,
+                referer = mainUrl,
+                subtitleCallback = subtitleCallback,
+                callback = callback
+            )
+            
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+}
+
+// -----------------------------------------------------------------
+// Data classes for MovHub API responses
+// -----------------------------------------------------------------
+private data class MovHubTitle(
+    val id: Int,
+    val slug: String,
+    val type: String,
+    val name: String,
+    val score: Int? = null,
+    val poster: String? = null
+) {
+    fun getPoster(): String {
+        return poster ?: "poster_placeholder.png"
+    }
+}
+
+private data class MovHubTitleProp(
+    val id: Int,
+    val slug: String,
+    val type: String,
+    val name: String,
+    val plot: String? = null,
+    val score: Float? = null,
+    val age: Int? = null,
+    val releaseDate: String? = null,
+    val runtime: Int? = null,
+    val imdbId: String? = null,
+    val tmdbId: Int? = null,
+    val genres: List<Genre> = emptyList(),
+    val mainActors: List<Actor> = emptyList(),
+    val trailers: List<Trailer>? = null,
+    val seasons: List<Season>? = null
+) {
+    fun getBackgroundImageId(): String {
+        return "background_placeholder.jpg"
+    }
+}
+
+private data class Genre(val name: String)
+private data class Actor(val name: String)
+private data class Trailer(val url: String) {
+    fun getYoutubeUrl(): String? {
+        return if (url.contains("youtube.com") || url.contains("youtu.be")) {
+            url
+        } else {
+            null
+        }
+    }
+}
+
+private data class Season(
+    val id: Int,
+    val number: Int,
+    val episodes: List<MovHubEpisode>? = null
+)
+
+private data class MovHubEpisode(
+    val id: Int,
+    val number: Int,
+    val name: String? = null,
+    val description: String? = null,
+    val released: String? = null,
+    val runtime: Int? = null,
+    val poster: String? = null
+)
+
+private data class MovHubSection(
+    val titles: List<MovHubTitle>
+)
+
+private data class MovHubInertiaResponse(
+    val component: String,
+    val props: Props,
+    val url: String,
+    val version: String
+)
+
+private data class Props(
+    val title: MovHubTitleProp? = null,
+    val titles: List<MovHubTitle>? = null,
+    val sliders: List<Slider>? = null,
+    val loadedSeason: LoadedSeason? = null
+)
+
+private data class Slider(
+    val name: String,
+    val titles: List<MovHubTitle>? = null
+)
+
+private data class LoadedSeason(
+    val id: Int,
+    val number: Int,
+    val episodes: List<MovHubEpisode>? = null
+)
+
+private data class MovHubSearchResponse(
+    val data: List<MovHubTitle>,
+    val lastPage: Int
+)
+
+private data class LoadData(
+    val url: String,
+    val type: String,
+    val tmdbId: Int? = null
+)
