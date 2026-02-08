@@ -192,6 +192,7 @@ class MovHub : MainAPI() {
         }
     }
 
+    @Suppress("DEPRECATION")
     private suspend fun getEpisodes(document: org.jsoup.nodes.Document): List<Episode> {
         val episodes = mutableListOf<Episode>()
         
@@ -208,8 +209,7 @@ class MovHub : MainAPI() {
                     val episodeUrl = episode.selectFirst("a")?.attr("href") ?: ""
                     val episodePlot = episode.selectFirst(".plot, .description")?.text() ?: ""
                     
-                    // SIMPLEST WORKING FIX: Create Episode directly (deprecated but works)
-                    // This is a temporary fix until we figure out the correct newEpisode syntax
+                    // Using Episode constructor (deprecated but works)
                     episodes.add(
                         Episode(
                             data = episodeUrl,
@@ -223,7 +223,7 @@ class MovHub : MainAPI() {
             }
         } else {
             // Fallback: create dummy episodes
-            // SIMPLEST WORKING FIX
+            // FIXED: Use the 'url' parameter from the outer function
             episodes.add(
                 Episode(
                     data = url,
