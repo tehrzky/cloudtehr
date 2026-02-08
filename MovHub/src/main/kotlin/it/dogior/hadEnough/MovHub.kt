@@ -136,7 +136,7 @@ class MovHub(
         }
 
         val resp = app.get(url, params = params)
-        val json = resp.parsed<MovHubSection>()
+        val json = resp.parseAs<MovHubSection>()
         val list = buildSearchResponses(json.titles)
 
         // Continue while we receive a full page (60 items)
@@ -162,7 +162,7 @@ class MovHub(
             headers = headers
         )
         
-        val result = resp.parsed<MovHubInertiaResponse>()
+        val result = resp.parseAs<MovHubInertiaResponse>()
         return buildSearchResponses(result.props.titles ?: emptyList())
     }
 
@@ -181,7 +181,7 @@ class MovHub(
         }
 
         val resp = app.get(url, params = params, headers = headers)
-        val result = resp.parsed<MovHubSearchResponse>()
+        val result = resp.parseAs<MovHubSearchResponse>()
 
         val hasNext = (page < 3) || (page < result.lastPage)
         return newSearchResponseList(buildSearchResponses(result.data), hasNext = hasNext)
@@ -265,7 +265,7 @@ class MovHub(
     override suspend fun load(url: String): LoadResponse {
         if (headers["Cookie"].isNullOrEmpty()) setupHeaders()
         val resp = app.get(url, headers = headers)
-        val json = resp.parsed<MovHubInertiaResponse>().props
+        val json = resp.parseAs<MovHubInertiaResponse>().props
         val title = json.title!!
 
         val domain = mainUrl.substringAfter("://").substringBeforeLast("/")
@@ -301,11 +301,11 @@ class MovHub(
                 plot = title.plot
                 title.age?.let { contentRating = "$it+" }
                 recommendations = json.sliders?.firstOrNull()?.titles?.let { buildSearchResponses(it) }
-                title.imdbId?.let { addImdbId(it) }
-                title.tmdbId?.let { addTMDbId(it.toString()) }
-                addActors(title.mainActors?.map { it.name })
-                title.score?.let { addScore(it) }
-                trailers?.takeIf { it.isNotEmpty() }?.let { addTrailer(it) }
+                title.imdbId?.let { imdbid = it }
+                title.tmdbId?.let { tmdbid = it.toString() }
+                title.mainActors?.map { it.name }?.let { actors = it }
+                title.score?.let { rating = it }
+                trailers?.takeIf { it.isNotEmpty() }?.let { trailer = it }
             }
         }
 
@@ -321,7 +321,7 @@ class MovHub(
             title.name,
             url,
             TvType.Movie,
-            dataUrl = loadData.toJson()
+            dataUrl = loadData.toJsonString()
         ) {
             posterUrl = poster
             backgroundPosterUrl = background
@@ -331,12 +331,12 @@ class MovHub(
             plot = title.plot
             title.age?.let { contentRating = "$it+" }
             recommendations = json.sliders?.firstOrNull()?.titles?.let { buildSearchResponses(it) }
-            addActors(title.mainActors?.map { it.name })
-            title.score?.let { addScore(it) }
-            title.imdbId?.let { addImdbId(it) }
-            title.tmdbId?.let { addTMDbId(it.toString()) }
-            title.runtime?.let { duration = it.toString() }
-            trailers?.takeIf { it.isNotEmpty() }?.let { addTrailer(it) }
+            title.mainActors?.map { it.name }?.let { actors = it }
+            title.score?.let { rating = it }
+            title.imdbId?.let { imdbid = it }
+            title.tmdbId?.let { tmdbid = it.toString() }
+            title.runtime?.let { duration = it }
+            trailers?.takeIf { it.isNotEmpty() }?.let { trailer = it }
         }
     }
 
@@ -356,25 +356,26 @@ class MovHub(
                 if (inertiaVersion.isEmpty()) setupHeaders()
                 val seasonUrl = "$mainUrl/titles/${title.id}-${title.slug}/season-${season.number}"
                 val resp = app.get(seasonUrl, headers = headers)
-                val response = resp.parsed<MovHubInertiaResponse>()
+                val response = resp.parseAs<MovHubInertiaResponse>()
                 response.props.loadedSeason?.episodes ?: emptyList()
             }
 
             rawEpisodes.forEach { episode ->
                 episodeList.add(
-                    newEpisode("$mainUrl/iframe/${episode.id}") {
-                        this.name = "Episode ${episode.number}"
-                        this.season = season.number
-                        this.episode = episode.number
-                        episode.name?.let { this.title = it }
-                        episode.poster?.let { posterId ->
+                    Episode(
+                        data = "$mainUrl/iframe/${episode.id}",
+                        name = "Episode ${episode.number}",
+                        season = season.number,
+                        episode = episode.number,
+                        title = episode.name,
+                        posterUrl = episode.poster?.let { posterId ->
                             val domain = mainUrl.substringAfter("://").substringBeforeLast("/")
-                            this.posterUrl = "https://cdn.$domain/images/$posterId"
-                        }
-                        episode.description?.let { this.description = it }
-                        episode.released?.let { this.date = it }
-                        episode.runtime?.let { this.duration = it.toString() }
-                    }
+                            "https://cdn.$domain/images/$posterId"
+                        },
+                        description = episode.description,
+                        date = episode.released,
+                        duration = episode.runtime?.toString()
+                    )
                 )
             }
         }
@@ -392,7 +393,7 @@ class MovHub(
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         return try {
-            val loadData = data.parsed<LoadData>()
+            val loadData = data.parseAs<LoadData>()
             val url = loadData.url
             
             // Extract token from URL
@@ -417,6 +418,11 @@ class MovHub(
             e.printStackTrace()
             false
         }
+    }
+
+    // Helper function to convert object to JSON string
+    private fun LoadData.toJsonString(): String {
+        return "{\"url\":\"$url\",\"type\":\"$type\",\"tmdbId\":${tmdbId ?: "null"}}"
     }
 }
 
