@@ -191,11 +191,13 @@ class MovHub : MainAPI() {
         val serversData = parseJson<ResultResponse>(serversResponse)
         val serversDoc = Jsoup.parse(serversData.result)
         
-        val servers = serversDoc.select("div.server")
+        // FIXED: Changed selector from div.server to li.link-item
+        val servers = serversDoc.select("li.link-item")
         println("MovHub DEBUG - Found ${servers.size} servers")
         
         servers.forEachIndexed { index, serverElement ->
-            val serverName = serverElement.selectFirst("span")?.text() ?: "Server ${index + 1}"
+            // FIXED: Get server name from the link text or data attribute
+            val serverName = serverElement.selectFirst("a")?.text() ?: "Server ${index + 1}"
             val serverId = serverElement.attr("data-lid")
             
             println("MovHub DEBUG - Processing server: $serverName (ID: $serverId)")
