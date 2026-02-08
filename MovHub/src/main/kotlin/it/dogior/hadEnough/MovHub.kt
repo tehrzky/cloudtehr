@@ -208,28 +208,27 @@ class MovHub : MainAPI() {
                     val episodeUrl = episode.selectFirst("a")?.attr("href") ?: ""
                     val episodePlot = episode.selectFirst(".plot, .description")?.text() ?: ""
                     
-                    // SIMPLIFIED FIX: Create Episode directly without builder
+                    // FIXED: Use newEpisode method correctly
                     episodes.add(
-                        Episode(
-                            data = episodeUrl,
-                            name = episodeTitle,
-                            season = seasonNumber,
-                            episode = episodeNumber,
-                            description = episodePlot
-                        )
+                        newEpisode(episodeUrl) {
+                            this.name = episodeTitle
+                            this.season = seasonNumber
+                            this.episode = episodeNumber
+                            this.description = episodePlot
+                        }
                     )
                 }
             }
         } else {
             // Fallback: create dummy episodes
+            // FIXED: Use newEpisode method correctly
             episodes.add(
-                Episode(
-                    data = url,
-                    name = "Episode 1",
-                    season = 1,
-                    episode = 1,
-                    description = "Watch this episode"
-                )
+                newEpisode(url) {
+                    this.name = "Episode 1"
+                    this.season = 1
+                    this.episode = 1
+                    this.description = "Watch this episode"
+                }
             )
         }
         
