@@ -1,0 +1,49 @@
+import org.jetbrains.kotlin.konan.properties.Properties
+// use an integer for version numbers
+
+version = 41
+
+
+cloudstream {
+    // All of these properties are optional, you can safely remove them
+
+    description = "MovHub"
+    authors = listOf("Yuzono","Tehrzky")
+
+    /**
+    * Status int as the following:
+    * 0: Down
+    * 1: Ok
+    * 2: Slow
+    * 3: Beta only
+    * */
+    status = 1
+    tvTypes = listOf(
+        "TvSeries",
+        "Movie",
+        "Documentary",
+        "Cartoon"
+    )
+
+    requiresResources = true
+    language = "en"
+
+    iconUrl = "https://raw.githubusercontent.com/DieGon7771/ItaliaInStreaming/master/StreamingCommunity/streamingunity_icon.png"
+}
+
+android {
+    buildFeatures {
+        buildConfig = true
+        viewBinding = true
+    }
+    defaultConfig {
+        val properties = Properties()
+        properties.load(project.rootProject.file("secrets.properties").inputStream())
+        android.buildFeatures.buildConfig = true
+        buildConfigField("String", "TMDB_API", "\"${properties.getProperty("TMDB_API")}\"")
+    }
+}
+
+dependencies {
+    implementation("com.google.android.material:material:1.12.0")
+}
