@@ -41,20 +41,22 @@ class RapidShareExtractor : ExtractorApi() {
             val baseUrl = "${rapidUrl.scheme}://${rapidUrl.host}"
             val mediaUrl = "$baseUrl/media/$token"
 
+            // Build headers
+            val requestHeaders = rapidHeaders.toMutableMap()
+            requestHeaders["Referer"] = "$baseUrl/"
+            requestHeaders["Origin"] = baseUrl
+
             // Get encrypted response
             val encryptedResponse = app.get(
                 mediaUrl,
-                headers = rapidHeaders.plus(
-                    "Referer" to "$baseUrl/",
-                    "Origin" to baseUrl
-                )
+                headers = requestHeaders
             )
 
             if (!encryptedResponse.isSuccessful) {
                 throw Exception("Failed to fetch encrypted response: ${encryptedResponse.code}")
             }
 
-            val encryptedResult = encryptedResponse.parsed<EncryptedRapidResponse>().result
+            val encryptedResult = encryptedResponse.parseAs<EncryptedRapidResponse>().result
 
             // Decrypt the response
             val decryptionBody = """
@@ -80,7 +82,7 @@ class RapidShareExtractor : ExtractorApi() {
                 throw Exception("Failed to decrypt: ${decryptResponse.code}")
             }
 
-            val rapidResult = decryptResponse.parsed<RapidDecryptResponse>().result
+            val rapidResult = decryptResponse.parseAs<RapidDecryptResponse>().result
 
             // Process subtitles
             val subtitleList = if (subtitleUrl != null) {
@@ -103,15 +105,15 @@ class RapidShareExtractor : ExtractorApi() {
                     videoUrl.contains(".m3u8") -> {
                         // For M3U8 streams
                         M3u8Helper.generateM3u8(
-                            name,
-                            videoUrl,
+                            sourceName = name,
+                            streamUrl = videoUrl,
                             referer = "$baseUrl/"
                         ).forEach(callback)
                     }
                     videoUrl.isNotBlank() -> {
                         // For direct video links (if any)
-                        callback(
-                            newExtractorLink(
+                        callback.invoke(
+                            ExtractorLink(
                                 source = name,
                                 name = "${name} - ${source.size}p",
                                 url = videoUrl,
@@ -139,7 +141,7 @@ class RapidShareExtractor : ExtractorApi() {
             )
 
             app.get(url, headers = subHeaders)
-                .parsed<List<RapidShareTrack>>()
+                .parseAs<List<RapidShareTrack>>()
                 .filter { it.kind == "captions" && it.file.isNotBlank() && it.label != null }
                 .map { SubtitleFile(it.file, it.label!!) }
         } catch (_: Exception) {
