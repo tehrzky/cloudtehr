@@ -26,13 +26,14 @@ class RapidShareExtractor : ExtractorApi() {
         try {
             val rapidUrl = url.toHttpUrl()
             val token = rapidUrl.pathSegments.last()
-            val subtitleUrl = rapidUrl.queryParameter("sub.list")
+            val subtitleUrl = rapidUrl.queryParameter("sub.info")  // Changed from sub.list to sub.info
             val baseUrl = "${rapidUrl.scheme}://${rapidUrl.host}"
             val mediaUrl = "$baseUrl/media/$token"
 
             println("RapidShare DEBUG - Token: $token")
             println("RapidShare DEBUG - Base URL: $baseUrl")
             println("RapidShare DEBUG - Media URL: $mediaUrl")
+            println("RapidShare DEBUG - Subtitle URL: $subtitleUrl")
 
             // Get encrypted response
             val encryptedResponse = app.get(mediaUrl).text
@@ -56,7 +57,12 @@ class RapidShareExtractor : ExtractorApi() {
 
             println("RapidShare DEBUG - Decrypted response: $decryptedResponse")
 
-            val rapidResult = parseJson<RapidDecryptResponse>(decryptedResponse).result
+            // FIXED: Parse as SimpleResponse (result is a string, not object)
+            val rapidDataString = parseJson<SimpleResponse>(decryptedResponse).result
+            println("RapidShare DEBUG - Decrypted data string: $rapidDataString")
+            
+            // Parse the decrypted string as JSON
+            val rapidResult = parseJson<RapidResult>(rapidDataString)
 
             println("RapidShare DEBUG - Found ${rapidResult.sources.size} sources")
             println("RapidShare DEBUG - Found ${rapidResult.tracks.size} tracks")
@@ -106,13 +112,13 @@ class RapidShareExtractor : ExtractorApi() {
     }
 
     @Serializable
-    data class EncryptedRapidResponse(
+    data class SimpleResponse(
         val result: String
     )
 
     @Serializable
-    data class RapidDecryptResponse(
-        val result: RapidResult
+    data class EncryptedRapidResponse(
+        val result: String
     )
 
     @Serializable
