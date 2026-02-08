@@ -236,7 +236,7 @@ class StreamingCommunity(
                 return null
             }
             
-            val jsonText = response.body?.string() ?: return null
+            val jsonText = response.body.string() ?: return null
             val json = JSONObject(jsonText)
             val logos = json.optJSONArray("logos") ?: return null
             if (logos.length() == 0) return null
