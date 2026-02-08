@@ -136,7 +136,7 @@ class MovHub(
         }
 
         val resp = app.get(url, params = params)
-        val json = parseJson<MovHubSection>(resp.text)
+        val json = resp.parsed<MovHubSection>()
         val list = buildSearchResponses(json.titles)
 
         // Continue while we receive a full page (60 items)
@@ -160,9 +160,9 @@ class MovHub(
             "${mainUrl}search",
             params = mapOf("q" to query),
             headers = headers
-        ).text
-
-        val result = parseJson<MovHubInertiaResponse>(resp)
+        )
+        
+        val result = resp.parsed<MovHubInertiaResponse>()
         return buildSearchResponses(result.props.titles ?: emptyList())
     }
 
@@ -180,8 +180,8 @@ class MovHub(
             params["offset"] = ((page - 1) * 60).toString()
         }
 
-        val resp = app.get(url, params = params, headers = headers).text
-        val result = parseJson<MovHubSearchResponse>(resp)
+        val resp = app.get(url, params = params, headers = headers)
+        val result = resp.parsed<MovHubSearchResponse>()
 
         val hasNext = (page < 3) || (page < result.lastPage)
         return newSearchResponseList(buildSearchResponses(result.data), hasNext = hasNext)
@@ -199,7 +199,7 @@ class MovHub(
             srcSet.split(", ").last()
         } else {
             val domain = mainUrl.substringAfter("://").substringBeforeLast("/")
-            "https://cdn.$domain/images/${title.getBackgroundImageId()}"
+            "https://cdn.$domain/images/background_placeholder.jpg"
         }
     }
 
@@ -265,14 +265,14 @@ class MovHub(
     override suspend fun load(url: String): LoadResponse {
         if (headers["Cookie"].isNullOrEmpty()) setupHeaders()
         val resp = app.get(url, headers = headers)
-        val json = parseJson<MovHubInertiaResponse>(resp.text).props
+        val json = resp.parsed<MovHubInertiaResponse>().props
         val title = json.title!!
 
         val domain = mainUrl.substringAfter("://").substringBeforeLast("/")
         val poster = fetchPoster(title)
-        val background = "https://cdn.$domain/images/${title.getBackgroundImageId()}"
+        val background = "https://cdn.$domain/images/background_placeholder.jpg"
         val year = title.releaseDate?.substringBefore('-')?.toIntOrNull()
-        val genres = title.genres.map { it.name.capitalize() }
+        val genres = title.genres.map { it.name }
         val trailers = title.trailers?.mapNotNull { it.getYoutubeUrl() }
 
         // Optional TMDB logo
@@ -304,7 +304,7 @@ class MovHub(
                 title.imdbId?.let { addImdbId(it) }
                 title.tmdbId?.let { addTMDbId(it.toString()) }
                 addActors(title.mainActors?.map { it.name })
-                addScore(title.score ?: 0)
+                title.score?.let { addScore(it) }
                 trailers?.takeIf { it.isNotEmpty() }?.let { addTrailer(it) }
             }
         }
@@ -332,10 +332,10 @@ class MovHub(
             title.age?.let { contentRating = "$it+" }
             recommendations = json.sliders?.firstOrNull()?.titles?.let { buildSearchResponses(it) }
             addActors(title.mainActors?.map { it.name })
-            addScore(title.score ?: 0)
+            title.score?.let { addScore(it) }
             title.imdbId?.let { addImdbId(it) }
             title.tmdbId?.let { addTMDbId(it.toString()) }
-            title.runtime?.let { duration = it }
+            title.runtime?.let { duration = it.toString() }
             trailers?.takeIf { it.isNotEmpty() }?.let { addTrailer(it) }
         }
     }
@@ -356,7 +356,7 @@ class MovHub(
                 if (inertiaVersion.isEmpty()) setupHeaders()
                 val seasonUrl = "$mainUrl/titles/${title.id}-${title.slug}/season-${season.number}"
                 val resp = app.get(seasonUrl, headers = headers)
-                val response = parseJson<MovHubInertiaResponse>(resp.text)
+                val response = resp.parsed<MovHubInertiaResponse>()
                 response.props.loadedSeason?.episodes ?: emptyList()
             }
 
@@ -373,7 +373,7 @@ class MovHub(
                         }
                         episode.description?.let { this.description = it }
                         episode.released?.let { this.date = it }
-                        episode.runtime?.let { this.duration = it }
+                        episode.runtime?.let { this.duration = it.toString() }
                     }
                 )
             }
@@ -392,7 +392,7 @@ class MovHub(
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         return try {
-            val loadData = parseJson<LoadData>(data)
+            val loadData = data.parsed<LoadData>()
             val url = loadData.url
             
             // Extract token from URL
@@ -452,11 +452,7 @@ private data class MovHubTitleProp(
     val mainActors: List<Actor> = emptyList(),
     val trailers: List<Trailer>? = null,
     val seasons: List<Season>? = null
-) {
-    fun getBackgroundImageId(): String {
-        return "background_placeholder.jpg"
-    }
-}
+)
 
 private data class Genre(val name: String)
 private data class Actor(val name: String)
