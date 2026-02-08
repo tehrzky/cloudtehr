@@ -3,7 +3,6 @@ package it.dogior.hadEnough
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.SubtitleFile
 import com.lagradost.cloudstream3.utils.loadExtractor
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
@@ -119,14 +118,14 @@ class MovHub : MainAPI() {
                 val episodeUrl = episode.selectFirst("a")?.attr("href") ?: ""
                 val episodePlot = episode.selectFirst(".episode-plot")?.text() ?: ""
                 
+                // FIXED: Using newEpisode method instead of deprecated constructor
                 episodes.add(
-                    Episode(
-                        data = episodeUrl,
-                        name = episodeTitle,
-                        season = seasonNumber,
-                        episode = episodeNumber,
-                        description = episodePlot
-                    )
+                    newEpisode(episodeUrl) {
+                        this.name = episodeTitle
+                        this.season = seasonNumber
+                        this.episode = episodeNumber
+                        this.description = episodePlot
+                    }
                 )
             }
         }
@@ -137,7 +136,7 @@ class MovHub : MainAPI() {
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
+        subtitleCallback: (com.lagradost.cloudstream3.SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val loadData = parseJson<LoadData>(data)
