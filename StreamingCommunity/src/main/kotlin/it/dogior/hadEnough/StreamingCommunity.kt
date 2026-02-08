@@ -176,7 +176,7 @@ class StreamingCommunity(
         )
     }
 
-    // FIXED SEARCH FUNCTION
+    // FIXED: Proper search function that returns List<SearchResponse>
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "$mainUrl/search"
         val params = mapOf("q" to query)
@@ -197,15 +197,18 @@ class StreamingCommunity(
                 searchResponseBuilder(result.props.titles)
             } else {
                 // If no titles in first response, try the paginated search API
-                search(query, 1).list
+                val paginatedResult = search(query, 1)
+                // Access the list from SearchResponseList
+                paginatedResult.responses
             }
         } catch (e: Exception) {
             // Fallback to paginated search if simple search fails
-            return search(query, 1).list
+            val paginatedResult = search(query, 1)
+            return paginatedResult.responses
         }
     }
 
-    // FIXED PAGINATED SEARCH FUNCTION
+    // FIXED: Returns SearchResponseList, not List<SearchResponse>
     override suspend fun search(query: String, page: Int): SearchResponseList {
         val searchUrl = "${mainUrl.replace("/it", "").replace("/en", "")}/api/search"
         val params = mutableMapOf("q" to query, "lang" to lang)
