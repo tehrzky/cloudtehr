@@ -15,6 +15,7 @@ include(
 //    "DaddyLive",
 //    "Huhu",
 //    "OnlineSerieTV",
+    "MovHub",
     "StreamingCommunity",
 //    "Stremio",
 //    "SyncStream.Beta",
