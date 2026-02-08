@@ -11,7 +11,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
 class RapidShareExtractor : ExtractorApi() {
-    override val mainUrl = "https://movhub.to"
+    override val mainUrl = "https://movhub.ws"
     override val name = "RapidShare"
     override val requiresReferer = true
 
