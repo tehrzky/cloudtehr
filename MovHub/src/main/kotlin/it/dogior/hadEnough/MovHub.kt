@@ -4,329 +4,223 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import kotlinx.serialization.Serializable
+import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
 class MovHub : MainAPI() {
-    override var mainUrl = "https://movhub.to"
+    override var mainUrl = "https://movhub.ws"
     override var name = "MovHub"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
     override val hasMainPage = true
 
-    // Simple main page sections
+    private val headers = mapOf(
+        "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Mobile Safari/537.36",
+        "Referer" to "$mainUrl/"
+    )
+
     override val mainPage = mainPageOf(
-        "$mainUrl/browse/trending" to "Trending",
-        "$mainUrl/browse/latest" to "Latest",
-        "$mainUrl/browse/top10" to "Top 10"
+        "$mainUrl/browser?sort=trending" to "Trending",
+        "$mainUrl/browser" to "Latest"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = request.data
-        val document = app.get(url).document
+        val url = "${request.data}&page=$page"
+        val document = app.get(url, headers = headers).document
         
-        // Debug: print the page title to verify we're getting content
-        println("MovHub DEBUG - Page title: ${document.title()}")
-        println("MovHub DEBUG - URL: $url")
-        
-        val items = mutableListOf<SearchResponse>()
-        
-        // Try to find all movie/show cards - be very broad with selectors
-        val cardSelectors = listOf(
-            "article",
-            "div[class*='card']",
-            "div[class*='item']",
-            "div[class*='movie']",
-            "div[class*='show']",
-            "div[class*='poster']",
-            "a[href*='/titles/']",
-            "a[href*='/movie/']",
-            "a[href*='/tv/']",
-            ".grid > div",
-            ".grid > a"
-        )
-        
-        for (selector in cardSelectors) {
-            val elements = document.select(selector)
-            println("MovHub DEBUG - Selector '$selector' found ${elements.size} elements")
+        val items = document.select("div.movie-cards div.item").mapNotNull { item ->
+            val poster = item.selectFirst("a.poster") ?: return@mapNotNull null
+            val title = item.selectFirst("a.title")?.text() ?: return@mapNotNull null
+            val itemUrl = poster.attr("href")
+            val posterUrl = item.selectFirst("img")?.attr("data-src") ?: ""
             
-            if (elements.size > 0) {
-                elements.forEach { element ->
-                    val item = extractSearchItem(element)
-                    if (item != null) {
-                        items.add(item)
-                    }
-                }
-                
-                if (items.isNotEmpty()) {
-                    println("MovHub DEBUG - Successfully extracted ${items.size} items with selector: $selector")
-                    break // Found working selector, stop trying others
-                }
-            }
-        }
-        
-        // Last resort: try finding all links that look like movie/show links
-        if (items.isEmpty()) {
-            println("MovHub DEBUG - Trying fallback link extraction")
-            document.select("a[href]").forEach { link ->
-                val href = link.attr("href")
-                if ((href.contains("/titles/") || href.contains("/movie/") || href.contains("/tv/")) && 
-                    !href.contains("/genre") && !href.contains("/search")) {
-                    
-                    val title = link.attr("title").ifEmpty { 
-                        link.selectFirst("img")?.attr("alt")?.ifEmpty { link.text().trim() } ?: link.text().trim()
-                    }
-                    
-                    if (title.length > 2) { // Avoid single character titles
-                        val poster = link.selectFirst("img")?.let { img ->
-                            img.attr("src").ifEmpty { 
-                                img.attr("data-src").ifEmpty { 
-                                    img.attr("data-lazy-src") 
-                                }
-                            }
-                        } ?: ""
-                        
-                        val fullUrl = fixUrl(href)
-                        val isSeries = href.contains("/tv/") || href.contains("/series/")
-                        
-                        val searchItem = if (isSeries) {
-                            newTvSeriesSearchResponse(title, fullUrl) {
-                                this.posterUrl = fixPosterUrl(poster)
-                            }
-                        } else {
-                            newMovieSearchResponse(title, fullUrl) {
-                                this.posterUrl = fixPosterUrl(poster)
-                            }
-                        }
-                        items.add(searchItem)
-                    }
-                }
-            }
-        }
-        
-        println("MovHub DEBUG - Total items found: ${items.size}")
-        return newHomePageResponse(request.name, items.distinctBy { it.url }, hasNext = false)
-    }
-
-    private fun extractSearchItem(element: Element): SearchResponse? {
-        return try {
-            // Try to find the link
-            val link = element.selectFirst("a[href*='/titles/'], a[href*='/movie/'], a[href*='/tv/']") 
-                ?: if (element.tagName() == "a") element else return null
-            
-            val href = link.attr("href")
-            if (href.isEmpty()) return null
-            
-            // Get title from multiple possible sources
-            val title = link.attr("title").ifEmpty {
-                link.selectFirst("img")?.attr("alt")?.ifEmpty {
-                    link.selectFirst("h2, h3, h4, .title, [class*='title']")?.text()?.ifEmpty {
-                        link.text().trim()
-                    }
-                } ?: link.text().trim()
-            } ?: ""
-            
-            if (title.isEmpty() || title.length < 2) return null
-            
-            // Find poster image with multiple fallbacks
-            val poster = element.selectFirst("img")?.let { img ->
-                img.attr("src").ifEmpty { 
-                    img.attr("data-src").ifEmpty { 
-                        img.attr("data-lazy-src") 
-                    }
-                }
-            } ?: ""
-            
-            // Determine type
-            val isSeries = href.contains("/tv/") || 
-                          href.contains("/series/") ||
-                          element.selectFirst("[class*='series'], [class*='tv']") != null
-            
-            val fullUrl = fixUrl(href)
+            val isSeries = itemUrl.contains("/tv/")
             
             if (isSeries) {
-                newTvSeriesSearchResponse(title, fullUrl) {
-                    this.posterUrl = fixPosterUrl(poster)
+                newTvSeriesSearchResponse(title, itemUrl) {
+                    this.posterUrl = posterUrl
                 }
             } else {
-                newMovieSearchResponse(title, fullUrl) {
-                    this.posterUrl = fixPosterUrl(poster)
+                newMovieSearchResponse(title, itemUrl) {
+                    this.posterUrl = posterUrl
                 }
             }
-        } catch (e: Exception) {
-            println("MovHub DEBUG - Error extracting item: ${e.message}")
-            null
         }
-    }
-
-    private fun fixUrl(url: String): String {
-        return if (url.startsWith("http")) {
-            url
-        } else if (url.startsWith("//")) {
-            "https:$url"
-        } else if (url.startsWith("/")) {
-            "$mainUrl$url"
-        } else {
-            "$mainUrl/$url"
-        }
-    }
-
-    private fun fixPosterUrl(url: String): String {
-        if (url.isEmpty()) return ""
-        return fixUrl(url)
+        
+        val hasNextPage = document.selectFirst("li.page-item a[rel=next]") != null
+        
+        return newHomePageResponse(request.name, items, hasNext = hasNextPage)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/search?q=$query"
-        println("MovHub DEBUG - Search URL: $searchUrl")
-        val document = app.get(searchUrl).document
+        val document = app.get("$mainUrl/browser?keyword=$query", headers = headers).document
         
-        val results = mutableListOf<SearchResponse>()
-        
-        // Try the same extraction logic as main page
-        document.select("a[href]").forEach { link ->
-            val href = link.attr("href")
-            if ((href.contains("/titles/") || href.contains("/movie/") || href.contains("/tv/")) && 
-                !href.contains("/genre")) {
-                
-                val title = link.attr("title").ifEmpty { 
-                    link.selectFirst("img")?.attr("alt") ?: link.text().trim()
+        return document.select("div.movie-cards div.item").mapNotNull { item ->
+            val poster = item.selectFirst("a.poster") ?: return@mapNotNull null
+            val title = item.selectFirst("a.title")?.text() ?: return@mapNotNull null
+            val itemUrl = poster.attr("href")
+            val posterUrl = item.selectFirst("img")?.attr("data-src") ?: ""
+            
+            val isSeries = itemUrl.contains("/tv/")
+            
+            if (isSeries) {
+                newTvSeriesSearchResponse(title, itemUrl) {
+                    this.posterUrl = posterUrl
                 }
-                
-                if (title.isNotEmpty() && title.contains(query, true)) {
-                    val poster = link.selectFirst("img")?.attr("src") ?: ""
-                    val isSeries = href.contains("/tv/") || href.contains("/series/")
-                    val fullUrl = fixUrl(href)
-                    
-                    if (isSeries) {
-                        results.add(newTvSeriesSearchResponse(title, fullUrl) {
-                            this.posterUrl = fixPosterUrl(poster)
-                        })
-                    } else {
-                        results.add(newMovieSearchResponse(title, fullUrl) {
-                            this.posterUrl = fixPosterUrl(poster)
-                        })
-                    }
+            } else {
+                newMovieSearchResponse(title, itemUrl) {
+                    this.posterUrl = posterUrl
                 }
             }
         }
-        
-        println("MovHub DEBUG - Search results: ${results.size}")
-        return results.distinctBy { it.url }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url).document
+        val document = app.get(url, headers = headers).document
         
-        // Extract title with multiple selectors
-        val title = document.selectFirst("h1, h2.title, .movie-title, [class*='title']")?.text() 
-            ?: document.title()
+        val title = document.selectFirst("h1.title")?.text() ?: "Unknown"
+        val posterUrl = document.selectFirst("div.poster img")?.attr("src") ?: ""
+        val plot = document.selectFirst(".description")?.text() ?: ""
         
-        // Extract plot
-        val plot = document.selectFirst(".plot, .description, .synopsis, .overview, p.description")?.text() ?: ""
+        val isMovie = document.selectFirst("ol.breadcrumb li a[href*='/movie']") != null
         
-        // Extract poster
-        val poster = document.selectFirst("img.poster, .poster img, img[class*='poster'], meta[property='og:image']")
-            ?.attr("content") 
-            ?: document.selectFirst("img.poster, .poster img, img[class*='poster']")?.attr("src") 
-            ?: ""
+        val genre = document.select("ul.mics li:has(a[href*=/genre/]) a").eachText()
+        val year = document.selectFirst("ul.mics li:contains(Released:)")
+            ?.text()?.substringAfter(":")?.trim()?.take(4)?.toIntOrNull()
         
-        // Extract year
-        val yearText = document.selectFirst(".year, .release-date, [class*='year'], [class*='date']")?.text() ?: ""
-        val year = yearText.filter { it.isDigit() }.take(4).toIntOrNull()
+        val contentId = document.selectFirst("#movie-rating[data-id]")?.attr("data-id")
+            ?: throw ErrorLoadingException("Content ID not found")
         
-        // Check if it's a series
-        val hasSeasons = document.select(".season, .episodes, [class*='season'], [class*='episode']").isNotEmpty()
-        
-        if (hasSeasons) {
-            // TV Series
-            val episodes = getEpisodes(document, url)
-            
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = fixPosterUrl(poster)
+        return if (isMovie) {
+            newMovieLoadResponse(title, url, TvType.Movie, contentId) {
+                this.posterUrl = posterUrl
                 this.plot = plot
+                this.tags = genre
                 this.year = year
             }
         } else {
-            // Movie
-            val iframeUrl = document.selectFirst("iframe[src]")?.attr("src") ?: url
-            val loadData = LoadData(
-                url = iframeUrl,
-                type = "movie"
-            )
-            
-            return newMovieLoadResponse(title, url, TvType.Movie, loadData.toJson()) {
-                this.posterUrl = fixPosterUrl(poster)
+            val episodes = getEpisodes(contentId, url)
+            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                this.posterUrl = posterUrl
                 this.plot = plot
+                this.tags = genre
                 this.year = year
             }
         }
     }
 
-    private suspend fun getEpisodes(document: org.jsoup.nodes.Document, pageUrl: String): List<Episode> {
+    private suspend fun getEpisodes(contentId: String, animeUrl: String): List<Episode> {
+        val encryptedId = encrypt(contentId)
+        val ajaxUrl = "$mainUrl/ajax/episodes/list?id=$contentId&_=$encryptedId"
+        
+        val ajaxHeaders = headers + mapOf(
+            "Accept" to "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With" to "XMLHttpRequest"
+        )
+        
+        val response = app.get(ajaxUrl, headers = ajaxHeaders).text
+        val resultData = parseJson<ResultResponse>(response)
+        val resultDoc = Jsoup.parse(resultData.result)
+        
         val episodes = mutableListOf<Episode>()
         
-        // Try to find seasons
-        val seasonElements = document.select(".season, [class*='season-'], [id*='season']")
-        
-        if (seasonElements.isNotEmpty()) {
-            seasonElements.forEachIndexed { seasonIndex, season ->
-                val seasonNumber = seasonIndex + 1
+        resultDoc.select("ul.episodes[data-season]").forEach { seasonElement ->
+            val seasonNum = seasonElement.attr("data-season").toIntOrNull() ?: 1
+            
+            seasonElement.select("li a").forEach { element ->
+                val episodeId = element.attr("eid")
+                val hasEpisodeNum = element.selectFirst("span.num") != null
                 
-                season.select(".episode, .episode-item, [class*='episode']").forEach { episode ->
-                    val episodeNumber = episode.selectFirst(".episode-num, .number")?.text()?.toIntOrNull() ?: 0
-                    val episodeTitle = episode.selectFirst(".episode-title, .title")?.text() ?: "Episode $episodeNumber"
-                    val episodeUrl = episode.selectFirst("a")?.attr("href") ?: ""
-                    val episodePlot = episode.selectFirst(".plot, .description")?.text() ?: ""
+                if (hasEpisodeNum) {
+                    // TV Episode
+                    val epNum = element.attr("num").toIntOrNull() ?: 0
+                    val epTitle = element.selectFirst("span:not(.num)")?.text()?.trim() ?: ""
                     
                     episodes.add(
-                        newEpisode(episodeUrl) {
-                            this.name = episodeTitle
-                            this.season = seasonNumber
-                            this.episode = episodeNumber
-                            this.description = episodePlot
+                        newEpisode(episodeId) {
+                            this.name = "S$seasonNum E$epNum: $epTitle"
+                            this.season = seasonNum
+                            this.episode = epNum
+                        }
+                    )
+                } else {
+                    // Movie
+                    val movieTitle = element.selectFirst("span")?.text()?.trim() ?: "Movie"
+                    episodes.add(
+                        newEpisode(episodeId) {
+                            this.name = movieTitle
+                            this.season = 1
+                            this.episode = 1
                         }
                     )
                 }
             }
-        } else {
-            // Fallback: create dummy episode
-            episodes.add(
-                newEpisode(pageUrl) {
-                    this.name = "Episode 1"
-                    this.season = 1
-                    this.episode = 1
-                    this.description = "Watch this episode"
-                }
-            )
         }
         
-        return episodes
+        return episodes.reversed()
     }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
-        subtitleCallback: (com.lagradost.cloudstream3.SubtitleFile) -> Unit,
+        subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val loadData = parseJson<LoadData>(data)
-        val url = loadData.url
+        val episodeId = data
         
-        println("MovHub DEBUG - Loading links for: $url")
+        val encryptedId = encrypt(episodeId)
+        val serversUrl = "$mainUrl/ajax/links/list?eid=$episodeId&_=$encryptedId"
         
-        if (url.contains("movhub.to") || url.contains("iframe") || url.contains("embed")) {
-            return loadExtractor(url, "$mainUrl/", subtitleCallback, callback)
+        val ajaxHeaders = headers + mapOf(
+            "Accept" to "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With" to "XMLHttpRequest"
+        )
+        
+        val serversResponse = app.get(serversUrl, headers = ajaxHeaders).text
+        val serversData = parseJson<ResultResponse>(serversResponse)
+        val serversDoc = Jsoup.parse(serversData.result)
+        
+        serversDoc.select("div.server").forEach { serverElement ->
+            val serverName = serverElement.selectFirst("span")?.text() ?: return@forEach
+            val serverId = serverElement.attr("data-lid")
+            
+            val encryptedServerId = encrypt(serverId)
+            val viewUrl = "$mainUrl/ajax/links/view?id=$serverId&_=$encryptedServerId"
+            
+            val viewResponse = app.get(viewUrl, headers = ajaxHeaders).text
+            val viewData = parseJson<ResultResponse>(viewResponse)
+            
+            val iframeUrl = decrypt(viewData.result)
+            
+            // Load the iframe URL with extractors
+            loadExtractor(iframeUrl, subtitleCallback, callback)
         }
         
-        return false
+        return true
     }
-}
 
-private data class LoadData(
-    val url: String,
-    val type: String
-)
+    private suspend fun encrypt(text: String): String {
+        val response = app.get("https://enc-dec.app/api/enc-movies-flix?text=$text").text
+        return parseJson<ResultResponse>(response).result
+    }
 
-private fun LoadData.toJson(): String {
-    return """{"url":"$url","type":"$type"}"""
+    private suspend fun decrypt(text: String): String {
+        val response = app.get("https://enc-dec.app/api/dec-movies-flix?text=$text").text
+        return parseJson<DecryptedIframeResponse>(response).result.url
+    }
+
+    @Serializable
+    data class ResultResponse(
+        val result: String
+    )
+
+    @Serializable
+    data class DecryptedIframeResponse(
+        val result: DecryptedResult
+    )
+
+    @Serializable
+    data class DecryptedResult(
+        val url: String
+    )
 }
