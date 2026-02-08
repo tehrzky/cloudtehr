@@ -27,7 +27,7 @@ class Settings(
     private val sharedPref: SharedPreferences?,
 ) : BottomSheetDialogFragment() {
 
-    private var currentLang: String = sharedPref?.getString("lang", "it") ?: "it"
+    private var currentLang: String = sharedPref?.getString("lang", "en") ?: "en"
     private var currentLangPosition: Int = sharedPref?.getInt("langPosition", 0) ?: 0
     
     
