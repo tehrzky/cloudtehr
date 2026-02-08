@@ -39,7 +39,7 @@ class RapidShareExtractor : ExtractorApi() {
             
             // Send subtitles
             subtitleUrls.forEach { subtitleUrl ->
-                subtitleCallback(SubtitleFile(subtitleUrl, "English"))
+                subtitleCallback(com.lagradost.cloudstream3.utils.newSubtitleFile("English", subtitleUrl))
             }
             
             // Process M3U8 URLs
