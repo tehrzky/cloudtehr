@@ -168,7 +168,7 @@ class MovHub : MainAPI() {
         
         if (hasSeasons) {
             // TV Series
-            val episodes = getEpisodes(document)
+            val episodes = getEpisodes(document, url)  // Add 'url' parameter here
             
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = fixPosterUrl(poster)
@@ -192,51 +192,48 @@ class MovHub : MainAPI() {
         }
     }
 
-    @Suppress("DEPRECATION")
-    private suspend fun getEpisodes(document: org.jsoup.nodes.Document): List<Episode> {
-        val episodes = mutableListOf<Episode>()
-        
-        // Try to find seasons
-        val seasonElements = document.select(".season, [class*=\"season-\"], [id*=\"season\"]")
-        
-        if (seasonElements.isNotEmpty()) {
-            seasonElements.forEachIndexed { seasonIndex, season ->
-                val seasonNumber = seasonIndex + 1
+    private suspend fun getEpisodes(document: org.jsoup.nodes.Document, pageUrl: String): List<Episode> {
+    val episodes = mutableListOf<Episode>()
+    
+    // Try to find seasons
+    val seasonElements = document.select(".season, [class*=\"season-\"], [id*=\"season\"]")
+    
+    if (seasonElements.isNotEmpty()) {
+        seasonElements.forEachIndexed { seasonIndex, season ->
+            val seasonNumber = seasonIndex + 1
+            
+            season.select(".episode, .episode-item, [class*=\"episode\"]").forEach { episode ->
+                val episodeNumber = episode.selectFirst(".episode-num, .number")?.text()?.toIntOrNull() ?: 0
+                val episodeTitle = episode.selectFirst(".episode-title, .title")?.text() ?: "Episode $episodeNumber"
+                val episodeUrl = episode.selectFirst("a")?.attr("href") ?: ""
+                val episodePlot = episode.selectFirst(".plot, .description")?.text() ?: ""
                 
-                season.select(".episode, .episode-item, [class*=\"episode\"]").forEach { episode ->
-                    val episodeNumber = episode.selectFirst(".episode-num, .number")?.text()?.toIntOrNull() ?: 0
-                    val episodeTitle = episode.selectFirst(".episode-title, .title")?.text() ?: "Episode $episodeNumber"
-                    val episodeUrl = episode.selectFirst("a")?.attr("href") ?: ""
-                    val episodePlot = episode.selectFirst(".plot, .description")?.text() ?: ""
-                    
-                    // Using Episode constructor (deprecated but works)
-                    episodes.add(
-                        Episode(
-                            data = episodeUrl,
-                            name = episodeTitle,
-                            season = seasonNumber,
-                            episode = episodeNumber,
-                            description = episodePlot
-                        )
+                episodes.add(
+                    Episode(
+                        data = episodeUrl,
+                        name = episodeTitle,
+                        season = seasonNumber,
+                        episode = episodeNumber,
+                        description = episodePlot
                     )
-                }
-            }
-        } else {
-            // Fallback: create dummy episodes
-            // FIXED: Use the 'url' parameter from the outer function
-            episodes.add(
-                Episode(
-                    data = url,
-                    name = "Episode 1",
-                    season = 1,
-                    episode = 1,
-                    description = "Watch this episode"
                 )
-            )
+            }
         }
-        
-        return episodes
+    } else {
+        // Fallback: create dummy episode using the page URL
+        episodes.add(
+            Episode(
+                data = pageUrl,
+                name = "Episode 1",
+                season = 1,
+                episode = 1,
+                description = "Watch this episode"
+            )
+        )
     }
+    
+    return episodes
+}
 
     override suspend fun loadLinks(
         data: String,
