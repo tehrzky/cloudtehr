@@ -191,16 +191,21 @@ class MovHub : MainAPI() {
         val serversData = parseJson<ResultResponse>(serversResponse)
         val serversDoc = Jsoup.parse(serversData.result)
         
-        // FIXED: Changed selector from div.server to li.link-item
-        val servers = serversDoc.select("li.link-item")
+        // FIXED: Select the <a> tags directly since they have the data-lid
+        val servers = serversDoc.select("li.link-item a[data-lid]")
         println("MovHub DEBUG - Found ${servers.size} servers")
         
         servers.forEachIndexed { index, serverElement ->
-            // FIXED: Get server name from the link text or data attribute
-            val serverName = serverElement.selectFirst("a")?.text() ?: "Server ${index + 1}"
+            val serverName = serverElement.text() ?: "Server ${index + 1}"
+            // FIXED: Get data-lid from the <a> element directly
             val serverId = serverElement.attr("data-lid")
             
             println("MovHub DEBUG - Processing server: $serverName (ID: $serverId)")
+            
+            if (serverId.isEmpty()) {
+                println("MovHub DEBUG - Skipping server with empty ID")
+                return@forEachIndexed
+            }
             
             try {
                 val encryptedServerId = encrypt(serverId)
