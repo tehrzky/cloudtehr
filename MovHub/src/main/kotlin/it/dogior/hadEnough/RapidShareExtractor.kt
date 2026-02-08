@@ -37,14 +37,13 @@ class RapidShareExtractor : ExtractorApi() {
             val subtitlePattern = """https?://[^"\s]+\.(vtt|srt)[^"\s]*""".toRegex()
             val subtitleUrls = subtitlePattern.findAll(responseText).map { it.value }.toList()
             
-            // Send subtitles
+            // Send subtitles - FIXED: Use simpler approach
             subtitleUrls.forEach { subtitleUrl ->
-                subtitleCallback(com.lagradost.cloudstream3.utils.newSubtitleFile("English", subtitleUrl))
+                subtitleCallback(SubtitleFile(subtitleUrl, "English"))
             }
             
             // Process M3U8 URLs
             m3u8Urls.forEach { m3u8Url ->
-                // FIXED: Added the required 'source' parameter
                 M3u8Helper.generateM3u8(
                     name, // source
                     m3u8Url, // streamUrl
