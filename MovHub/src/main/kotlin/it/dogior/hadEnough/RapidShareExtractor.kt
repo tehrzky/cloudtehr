@@ -44,7 +44,7 @@ class RapidShareExtractor : ExtractorApi() {
             // Get encrypted response
             val encryptedResponse = app.get(
                 mediaUrl,
-                headers = rapidHeaders + mapOf(
+                headers = rapidHeaders.plus(
                     "Referer" to "$baseUrl/",
                     "Origin" to baseUrl
                 )
@@ -103,8 +103,8 @@ class RapidShareExtractor : ExtractorApi() {
                     videoUrl.contains(".m3u8") -> {
                         // For M3U8 streams
                         M3u8Helper.generateM3u8(
-                            name = name,
-                            url = videoUrl,
+                            name,
+                            videoUrl,
                             referer = "$baseUrl/"
                         ).forEach(callback)
                     }
@@ -116,10 +116,9 @@ class RapidShareExtractor : ExtractorApi() {
                                 name = "${name} - ${source.size}p",
                                 url = videoUrl,
                                 type = ExtractorLinkType.VIDEO,
-                                quality = source.size
-                            ) {
-                                this.referer = "$baseUrl/"
-                            }
+                                quality = source.size,
+                                referer = "$baseUrl/"
+                            )
                         )
                     }
                 }
