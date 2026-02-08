@@ -44,9 +44,10 @@ class RapidShareExtractor : ExtractorApi() {
             
             // Process M3U8 URLs
             m3u8Urls.forEach { m3u8Url ->
+                // FIXED: Added the required 'source' parameter
                 M3u8Helper.generateM3u8(
-                    name = name,
-                    streamUrl = m3u8Url,
+                    name, // source
+                    m3u8Url, // streamUrl
                     referer = "$baseUrl/"
                 ).forEach(callback)
             }
