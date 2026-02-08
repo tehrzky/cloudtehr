@@ -20,7 +20,7 @@ class MovHub : MainAPI() {
 
     override val mainPage = mainPageOf(
         "$mainUrl/browser?sort=trending" to "Trending",
-        "$mainUrl/browser?sort=latest" to "Latest",  // FIXED: Added sort parameter
+        "$mainUrl/browser?sort=latest" to "Latest",
         "$mainUrl/browser?sort=popular" to "Popular"
     )
 
@@ -164,82 +164,82 @@ class MovHub : MainAPI() {
     }
 
     override suspend fun loadLinks(
-    data: String,
-    isCasting: Boolean,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-): Boolean {
-    val episodeId = data
-    
-    println("MovHub DEBUG - Loading links for episode ID: $episodeId")
-    
-    try {
-        val encryptedId = encrypt(episodeId)
-        println("MovHub DEBUG - Encrypted ID: $encryptedId")
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val episodeId = data
         
-        val serversUrl = "$mainUrl/ajax/links/list?eid=$episodeId&_=$encryptedId"
-        println("MovHub DEBUG - Servers URL: $serversUrl")
+        println("MovHub DEBUG - Loading links for episode ID: $episodeId")
         
-        val ajaxHeaders = headers + mapOf(
-            "Accept" to "application/json, text/javascript, */*; q=0.01",
-            "X-Requested-With" to "XMLHttpRequest"
-        )
-        
-        val serversResponse = app.get(serversUrl, headers = ajaxHeaders).text
-        println("MovHub DEBUG - Servers response: $serversResponse")
-        
-        val serversData = parseJson<ResultResponse>(serversResponse)
-        val serversDoc = Jsoup.parse(serversData.result)
-        
-        // FIXED: Select the <a> tags directly since they have the data-lid
-        val servers = serversDoc.select("li.link-item a[data-lid]")
-        println("MovHub DEBUG - Found ${servers.size} servers")
-        
-        servers.forEachIndexed { index, serverElement ->
-            val serverName = serverElement.text() ?: "Server ${index + 1}"
-            // FIXED: Get data-lid from the <a> element directly
-            val serverId = serverElement.attr("data-lid")
+        try {
+            val encryptedId = encrypt(episodeId)
+            val serversUrl = "$mainUrl/ajax/links/list?eid=$episodeId&_=$encryptedId"
             
-            println("MovHub DEBUG - Processing server: $serverName (ID: $serverId)")
+            val ajaxHeaders = headers + mapOf(
+                "Accept" to "application/json, text/javascript, */*; q=0.01",
+                "X-Requested-With" to "XMLHttpRequest"
+            )
             
-            if (serverId.isEmpty()) {
-                println("MovHub DEBUG - Skipping server with empty ID")
-                return@forEachIndexed
+            val serversResponse = app.get(serversUrl, headers = ajaxHeaders).text
+            val serversData = parseJson<ResultResponse>(serversResponse)
+            val serversDoc = Jsoup.parse(serversData.result)
+            
+            val servers = serversDoc.select("li.link-item a[data-lid]")
+            println("MovHub DEBUG - Found ${servers.size} servers")
+            
+            servers.forEachIndexed { index, serverElement ->
+                val serverName = serverElement.text() ?: "Server ${index + 1}"
+                val serverId = serverElement.attr("data-lid")
+                
+                println("MovHub DEBUG - Processing server: $serverName (ID: $serverId)")
+                
+                if (serverId.isEmpty()) {
+                    println("MovHub DEBUG - Skipping server with empty ID")
+                    return@forEachIndexed
+                }
+                
+                try {
+                    val encryptedServerId = encrypt(serverId)
+                    val viewUrl = "$mainUrl/ajax/links/view?id=$serverId&_=$encryptedServerId"
+                    
+                    val viewResponse = app.get(viewUrl, headers = ajaxHeaders).text
+                    println("MovHub DEBUG - View response: $viewResponse")
+                    
+                    val viewData = parseJson<ResultResponse>(viewResponse)
+                    
+                    val encryptedIframeUrl = viewData.result
+                    println("MovHub DEBUG - Encrypted iframe URL: $encryptedIframeUrl")
+                    
+                    // Only decrypt if it doesn't look like a URL already
+                    val iframeUrl = if (encryptedIframeUrl.startsWith("http")) {
+                        println("MovHub DEBUG - URL is already decrypted: $encryptedIframeUrl")
+                        encryptedIframeUrl
+                    } else {
+                        println("MovHub DEBUG - Decrypting URL...")
+                        decrypt(encryptedIframeUrl)
+                    }
+                    
+                    println("MovHub DEBUG - Final iframe URL: $iframeUrl")
+                    
+                    // Use the RapidShare extractor
+                    val extractor = RapidShareExtractor()
+                    extractor.getUrl(iframeUrl, mainUrl, subtitleCallback, callback)
+                    
+                } catch (e: Exception) {
+                    println("MovHub DEBUG - Error processing server $serverName: ${e.message}")
+                    e.printStackTrace()
+                }
             }
             
-            try {
-                val encryptedServerId = encrypt(serverId)
-                println("MovHub DEBUG - Encrypted server ID: $encryptedServerId")
-                
-                val viewUrl = "$mainUrl/ajax/links/view?id=$serverId&_=$encryptedServerId"
-                println("MovHub DEBUG - View URL: $viewUrl")
-                
-                val viewResponse = app.get(viewUrl, headers = ajaxHeaders).text
-                println("MovHub DEBUG - View response: $viewResponse")
-                
-                val viewData = parseJson<ResultResponse>(viewResponse)
-                println("MovHub DEBUG - View data result: ${viewData.result}")
-                
-                val iframeUrl = decrypt(viewData.result)
-                println("MovHub DEBUG - Decrypted iframe URL: $iframeUrl")
-                
-                // Use the RapidShare extractor
-                val extractor = RapidShareExtractor()
-                extractor.getUrl(iframeUrl, mainUrl, subtitleCallback, callback)
-                
-            } catch (e: Exception) {
-                println("MovHub DEBUG - Error processing server $serverName: ${e.message}")
-                e.printStackTrace()
-            }
+            return true
+        } catch (e: Exception) {
+            println("MovHub DEBUG - Error in loadLinks: ${e.message}")
+            e.printStackTrace()
+            return false
         }
-        
-        return true
-    } catch (e: Exception) {
-        println("MovHub DEBUG - Error in loadLinks: ${e.message}")
-        e.printStackTrace()
-        return false
     }
-}
 
     private suspend fun encrypt(text: String): String {
         val response = app.get("https://enc-dec.app/api/enc-movies-flix?text=$text").text
@@ -248,7 +248,16 @@ class MovHub : MainAPI() {
 
     private suspend fun decrypt(text: String): String {
         val response = app.get("https://enc-dec.app/api/dec-movies-flix?text=$text").text
-        return parseJson<DecryptedIframeResponse>(response).result.url
+        println("MovHub DEBUG - Raw decrypt response: $response")
+        
+        return try {
+            // Parse as nested object
+            parseJson<DecryptedIframeResponse>(response).result.url
+        } catch (e: Exception) {
+            // Fallback: parse as simple string result
+            val jsonObj = org.json.JSONObject(response)
+            jsonObj.getString("result")
+        }
     }
 
     @Serializable
