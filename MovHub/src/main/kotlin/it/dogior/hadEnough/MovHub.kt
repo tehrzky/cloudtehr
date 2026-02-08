@@ -6,7 +6,6 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import kotlinx.serialization.Serializable
 import org.jsoup.Jsoup
-import org.jsoup.nodes.Element
 
 class MovHub : MainAPI() {
     override var mainUrl = "https://movhub.ws"
@@ -21,7 +20,8 @@ class MovHub : MainAPI() {
 
     override val mainPage = mainPageOf(
         "$mainUrl/browser?sort=trending" to "Trending",
-        "$mainUrl/browser" to "Latest"
+        "$mainUrl/browser?sort=latest" to "Latest",  // FIXED: Added sort parameter
+        "$mainUrl/browser?sort=popular" to "Popular"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -31,7 +31,7 @@ class MovHub : MainAPI() {
         val items = document.select("div.movie-cards div.item").mapNotNull { item ->
             val poster = item.selectFirst("a.poster") ?: return@mapNotNull null
             val title = item.selectFirst("a.title")?.text() ?: return@mapNotNull null
-            val itemUrl = poster.attr("href")
+            val itemUrl = fixUrl(poster.attr("href"))
             val posterUrl = item.selectFirst("img")?.attr("data-src") ?: ""
             
             val isSeries = itemUrl.contains("/tv/")
@@ -52,13 +52,17 @@ class MovHub : MainAPI() {
         return newHomePageResponse(request.name, items, hasNext = hasNextPage)
     }
 
+    private fun fixUrl(url: String): String {
+        return if (url.startsWith("http")) url else "$mainUrl$url"
+    }
+
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/browser?keyword=$query", headers = headers).document
         
         return document.select("div.movie-cards div.item").mapNotNull { item ->
             val poster = item.selectFirst("a.poster") ?: return@mapNotNull null
             val title = item.selectFirst("a.title")?.text() ?: return@mapNotNull null
-            val itemUrl = poster.attr("href")
+            val itemUrl = fixUrl(poster.attr("href"))
             val posterUrl = item.selectFirst("img")?.attr("data-src") ?: ""
             
             val isSeries = itemUrl.contains("/tv/")
@@ -115,7 +119,8 @@ class MovHub : MainAPI() {
         
         val ajaxHeaders = headers + mapOf(
             "Accept" to "application/json, text/javascript, */*; q=0.01",
-            "X-Requested-With" to "XMLHttpRequest"
+            "X-Requested-With" to "XMLHttpRequest",
+            "Referer" to animeUrl
         )
         
         val response = app.get(ajaxUrl, headers = ajaxHeaders).text
@@ -132,7 +137,6 @@ class MovHub : MainAPI() {
                 val hasEpisodeNum = element.selectFirst("span.num") != null
                 
                 if (hasEpisodeNum) {
-                    // TV Episode
                     val epNum = element.attr("num").toIntOrNull() ?: 0
                     val epTitle = element.selectFirst("span:not(.num)")?.text()?.trim() ?: ""
                     
@@ -144,7 +148,6 @@ class MovHub : MainAPI() {
                         }
                     )
                 } else {
-                    // Movie
                     val movieTitle = element.selectFirst("span")?.text()?.trim() ?: "Movie"
                     episodes.add(
                         newEpisode(episodeId) {
@@ -181,7 +184,6 @@ class MovHub : MainAPI() {
         val serversDoc = Jsoup.parse(serversData.result)
         
         serversDoc.select("div.server").forEach { serverElement ->
-            val serverName = serverElement.selectFirst("span")?.text() ?: return@forEach
             val serverId = serverElement.attr("data-lid")
             
             val encryptedServerId = encrypt(serverId)
@@ -192,8 +194,9 @@ class MovHub : MainAPI() {
             
             val iframeUrl = decrypt(viewData.result)
             
-            // Load the iframe URL with extractors
-            loadExtractor(iframeUrl, subtitleCallback, callback)
+            // Use the RapidShare extractor
+            val extractor = RapidShareExtractor()
+            extractor.getUrl(iframeUrl, mainUrl, subtitleCallback, callback)
         }
         
         return true
