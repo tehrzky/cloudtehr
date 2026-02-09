@@ -26,7 +26,7 @@ class RapidShareExtractor : ExtractorApi() {
         try {
             val rapidUrl = url.toHttpUrl()
             val token = rapidUrl.pathSegments.last()
-            val subtitleUrl = rapidUrl.queryParameter("sub.info")  // Changed from sub.list to sub.info
+            val subtitleUrl = rapidUrl.queryParameter("sub.info")
             val baseUrl = "${rapidUrl.scheme}://${rapidUrl.host}"
             val mediaUrl = "$baseUrl/media/$token"
 
@@ -57,51 +57,72 @@ class RapidShareExtractor : ExtractorApi() {
 
             println("RapidShare DEBUG - Decrypted response: $decryptedResponse")
 
-            // FIXED: Parse as SimpleResponse (result is a string, not object)
             val rapidDataString = parseJson<SimpleResponse>(decryptedResponse).result
             println("RapidShare DEBUG - Decrypted data string: $rapidDataString")
             
-            // Parse the decrypted string as JSON
-            val rapidResult = parseJson<RapidResult>(rapidDataString)
-
-            println("RapidShare DEBUG - Found ${rapidResult.sources.size} sources")
-            println("RapidShare DEBUG - Found ${rapidResult.tracks.size} tracks")
-
-            // Handle subtitles
-            val subtitles = if (subtitleUrl != null) {
-                println("RapidShare DEBUG - Fetching subtitles from: $subtitleUrl")
-                try {
-                    val subResponse = app.get(subtitleUrl, headers = mapOf("Origin" to baseUrl)).text
-                    parseJson<List<RapidShareTrack>>(subResponse)
-                        .filter { it.kind == "captions" && it.file.isNotBlank() && it.label != null }
-                        .map { SubtitleFile(it.label!!, it.file) }
-                } catch (e: Exception) {
-                    println("RapidShare DEBUG - Error fetching subtitles: ${e.message}")
-                    emptyList()
+            // Check if it's a direct URL or JSON object
+            if (rapidDataString.startsWith("http")) {
+                // It's a direct M3U8 URL
+                println("RapidShare DEBUG - Direct M3U8 URL detected")
+                
+                // Handle subtitles if available
+                if (subtitleUrl != null) {
+                    println("RapidShare DEBUG - Fetching subtitles from: $subtitleUrl")
+                    try {
+                        val subResponse = app.get(subtitleUrl, headers = mapOf("Origin" to baseUrl)).text
+                        val subtitles = parseJson<List<RapidShareTrack>>(subResponse)
+                            .filter { it.kind == "captions" && it.file.isNotBlank() && it.label != null }
+                            .map { SubtitleFile(it.label!!, it.file) }
+                        
+                        println("RapidShare DEBUG - Found ${subtitles.size} subtitles")
+                        subtitles.forEach(subtitleCallback)
+                    } catch (e: Exception) {
+                        println("RapidShare DEBUG - Error fetching subtitles: ${e.message}")
+                    }
                 }
+                
+                // Process the M3U8 URL
+                println("RapidShare DEBUG - Processing M3U8: $rapidDataString")
+                val m3u8Links = M3u8Helper.generateM3u8(
+                    name,
+                    rapidDataString,
+                    referer = "$baseUrl/",
+                    headers = mapOf("Origin" to baseUrl)
+                )
+                println("RapidShare DEBUG - Generated ${m3u8Links.size} M3U8 links")
+                m3u8Links.forEach(callback)
+                
             } else {
-                rapidResult.tracks
+                // It's a JSON object with sources and tracks
+                println("RapidShare DEBUG - JSON object detected, parsing...")
+                val rapidResult = parseJson<RapidResult>(rapidDataString)
+
+                println("RapidShare DEBUG - Found ${rapidResult.sources.size} sources")
+                println("RapidShare DEBUG - Found ${rapidResult.tracks.size} tracks")
+
+                // Handle subtitles from JSON
+                val subtitles = rapidResult.tracks
                     .filter { it.kind == "captions" && it.file.isNotBlank() && it.label != null }
                     .map { SubtitleFile(it.label!!, it.file) }
-            }
 
-            println("RapidShare DEBUG - Found ${subtitles.size} subtitles")
-            subtitles.forEach(subtitleCallback)
+                println("RapidShare DEBUG - Found ${subtitles.size} subtitles")
+                subtitles.forEach(subtitleCallback)
 
-            // Extract video sources
-            rapidResult.sources.forEach { source ->
-                val videoUrl = source.file
-                println("RapidShare DEBUG - Processing source: $videoUrl")
-                
-                if (videoUrl.contains(".m3u8")) {
-                    val m3u8Links = M3u8Helper.generateM3u8(
-                        name,
-                        videoUrl,
-                        referer = "$baseUrl/",
-                        headers = mapOf("Origin" to baseUrl)
-                    )
-                    println("RapidShare DEBUG - Generated ${m3u8Links.size} M3U8 links")
-                    m3u8Links.forEach(callback)
+                // Extract video sources
+                rapidResult.sources.forEach { source ->
+                    val videoUrl = source.file
+                    println("RapidShare DEBUG - Processing source: $videoUrl")
+                    
+                    if (videoUrl.contains(".m3u8")) {
+                        val m3u8Links = M3u8Helper.generateM3u8(
+                            name,
+                            videoUrl,
+                            referer = "$baseUrl/",
+                            headers = mapOf("Origin" to baseUrl)
+                        )
+                        println("RapidShare DEBUG - Generated ${m3u8Links.size} M3U8 links")
+                        m3u8Links.forEach(callback)
+                    }
                 }
             }
 
