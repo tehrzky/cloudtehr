@@ -78,18 +78,18 @@ class RapidShareExtractor : ExtractorApi() {
             
             // Check if it's a direct URL or JSON object
             if (rapidDataString.startsWith("http")) {
-                // It's a direct M3U8 URL - create link directly like VixSrc
+                // It's a direct M3U8 URL - create link using helper function
                 println("RapidShare DEBUG - Direct M3U8 URL detected: $rapidDataString")
                 
                 callback.invoke(
-                    ExtractorLink(
+                    newExtractorLink(
                         source = name,
                         name = name,
                         url = rapidDataString,
-                        referer = "$baseUrl/",
-                        quality = Qualities.Unknown.value,
                         type = ExtractorLinkType.M3U8
-                    )
+                    ) {
+                        this.referer = "$baseUrl/"
+                    }
                 )
                 println("RapidShare DEBUG - ExtractorLink created successfully")
                 
@@ -116,14 +116,14 @@ class RapidShareExtractor : ExtractorApi() {
                     
                     if (videoUrl.contains(".m3u8")) {
                         callback.invoke(
-                            ExtractorLink(
+                            newExtractorLink(
                                 source = name,
                                 name = name,
                                 url = videoUrl,
-                                referer = "$baseUrl/",
-                                quality = Qualities.Unknown.value,
                                 type = ExtractorLinkType.M3U8
-                            )
+                            ) {
+                                this.referer = "$baseUrl/"
+                            }
                         )
                         println("RapidShare DEBUG - ExtractorLink created for: $videoUrl")
                     }
