@@ -11,7 +11,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
 class RapidShareExtractor : ExtractorApi() {
-    override val mainUrl = "https://movhub.ws"
+    override val mainUrl = "https://rapid.yuzuha.xyz"  // FIXED: Changed to actual rapid domain
     override val name = "RapidShare"
     override val requiresReferer = true
 
@@ -77,17 +77,18 @@ class RapidShareExtractor : ExtractorApi() {
                 // Direct M3U8 URL
                 println("RapidShare DEBUG - Creating ExtractorLink for: $rapidDataString")
                 
-                val link = newExtractorLink(
-                    source = name,
-                    name = name,
-                    url = rapidDataString,
-                    type = ExtractorLinkType.M3U8
-                ) {
-                    this.referer = baseUrl
-                }
+                callback.invoke(
+                    newExtractorLink(
+                        source = name,
+                        name = name,
+                        url = rapidDataString,
+                        type = ExtractorLinkType.M3U8
+                    ) {
+                        this.referer = baseUrl
+                    }
+                )
                 
-                println("RapidShare DEBUG - Link created with referer: $baseUrl")
-                callback.invoke(link)
+                println("RapidShare DEBUG - ExtractorLink created and invoked")
                 
             } else {
                 // JSON object with sources
@@ -95,34 +96,32 @@ class RapidShareExtractor : ExtractorApi() {
                 val rapidResult = parseJson<RapidResult>(rapidDataString)
 
                 println("RapidShare DEBUG - Found ${rapidResult.sources.size} sources")
-                println("RapidShare DEBUG - Found ${rapidResult.tracks.size} tracks")
 
                 // Handle subtitles from JSON
                 rapidResult.tracks
                     .filter { it.kind == "captions" && it.file.isNotBlank() && it.label != null }
                     .forEach { 
-                        println("RapidShare DEBUG - Adding subtitle: ${it.label}")
                         subtitleCallback(SubtitleFile(it.label!!, it.file))
                     }
 
                 // Extract video sources
-                rapidResult.sources.forEachIndexed { index, source ->
-                    println("RapidShare DEBUG - Source $index: ${source.file}")
+                rapidResult.sources.forEach { source ->
                     if (source.file.contains(".m3u8")) {
-                        val link = newExtractorLink(
-                            source = name,
-                            name = "$name - Source ${index + 1}",
-                            url = source.file,
-                            type = ExtractorLinkType.M3U8
-                        ) {
-                            this.referer = baseUrl
-                        }
-                        callback.invoke(link)
+                        callback.invoke(
+                            newExtractorLink(
+                                source = name,
+                                name = name,
+                                url = source.file,
+                                type = ExtractorLinkType.M3U8
+                            ) {
+                                this.referer = baseUrl
+                            }
+                        )
                     }
                 }
             }
             
-            println("RapidShare DEBUG - Extraction completed")
+            println("RapidShare DEBUG - Extraction completed successfully")
 
         } catch (e: Exception) {
             println("RapidShare DEBUG - Error: ${e.message}")
