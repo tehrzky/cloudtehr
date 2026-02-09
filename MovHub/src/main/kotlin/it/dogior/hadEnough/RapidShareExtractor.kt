@@ -55,26 +55,32 @@ class RapidShareExtractor : ExtractorApi() {
                     parseJson<List<RapidShareTrack>>(subResponse)
                         .filter { it.kind == "captions" && it.file.isNotBlank() && it.label != null }
                         .forEach { subtitleCallback(SubtitleFile(it.label!!, it.file)) }
+                    println("RapidShare DEBUG - Subtitles added")
                 } catch (e: Exception) {
                     println("RapidShare DEBUG - Subtitle error: ${e.message}")
                 }
             }
             
-            // Create M3U8 link using M3u8Helper
-            if (rapidDataString.startsWith("http") && rapidDataString.contains(".m3u8")) {
-                println("RapidShare DEBUG - Generating M3U8 links")
+            // Create direct M3U8 link without using M3u8Helper
+            if (rapidDataString.startsWith("http")) {
+                println("RapidShare DEBUG - Creating direct M3U8 link")
                 
-                M3u8Helper.generateM3u8(
+                val link = newExtractorLink(
                     source = name,
-                    streamUrl = rapidDataString,
-                    referer = baseUrl
-                ).forEach { link ->
-                    println("RapidShare DEBUG - Adding link: ${link.name} - ${link.url}")
-                    callback(link)
+                    name = name,
+                    url = rapidDataString,
+                    type = ExtractorLinkType.M3U8
+                ) {
+                    this.referer = baseUrl
                 }
+                
+                println("RapidShare DEBUG - Link created: ${link.url}")
+                callback(link)
+                println("RapidShare DEBUG - Link sent to callback")
                 
             } else {
                 // Fallback: try parsing as JSON
+                println("RapidShare DEBUG - Trying JSON parsing")
                 try {
                     val rapidResult = parseJson<RapidResult>(rapidDataString)
                     
@@ -85,25 +91,18 @@ class RapidShareExtractor : ExtractorApi() {
                     rapidResult.sources
                         .filter { it.file.contains(".m3u8") }
                         .forEach { source ->
-                            M3u8Helper.generateM3u8(
+                            val link = newExtractorLink(
                                 source = name,
-                                streamUrl = source.file,
-                                referer = baseUrl
-                            ).forEach(callback)
+                                name = name,
+                                url = source.file,
+                                type = ExtractorLinkType.M3U8
+                            ) {
+                                this.referer = baseUrl
+                            }
+                            callback(link)
                         }
                 } catch (e: Exception) {
-                    println("RapidShare DEBUG - Not JSON, creating direct link")
-                    // Last resort: create a simple direct link using newExtractorLink
-                    callback(
-                        newExtractorLink(
-                            source = name,
-                            name = name,
-                            url = rapidDataString,
-                            type = if (rapidDataString.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                        ) {
-                            this.referer = baseUrl
-                        }
-                    )
+                    println("RapidShare DEBUG - JSON parse failed: ${e.message}")
                 }
             }
             
