@@ -60,7 +60,7 @@ class RapidShareExtractor : ExtractorApi() {
                 }
             }
             
-            // Create M3U8 link using M3u8Helper instead
+            // Create M3U8 link using M3u8Helper
             if (rapidDataString.startsWith("http") && rapidDataString.contains(".m3u8")) {
                 println("RapidShare DEBUG - Generating M3U8 links")
                 
@@ -93,19 +93,21 @@ class RapidShareExtractor : ExtractorApi() {
                         }
                 } catch (e: Exception) {
                     println("RapidShare DEBUG - Not JSON, creating direct link")
-                    // Last resort: create a simple direct link
+                    // Last resort: create a simple direct link using newExtractorLink
                     callback(
-                        ExtractorLink(
+                        newExtractorLink(
                             source = name,
                             name = name,
                             url = rapidDataString,
-                            referer = baseUrl,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = rapidDataString.contains(".m3u8")
-                        )
+                            type = if (rapidDataString.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                        ) {
+                            this.referer = baseUrl
+                        }
                     )
                 }
             }
+            
+            println("RapidShare DEBUG - Extraction completed")
 
         } catch (e: Exception) {
             println("RapidShare DEBUG - Error: ${e.message}")
