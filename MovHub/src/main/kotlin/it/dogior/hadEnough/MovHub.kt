@@ -19,9 +19,9 @@ class MovHub : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "$mainUrl/browser?sort=trending" to "Trending",
-        "$mainUrl/browser?sort=latest" to "Latest",
-        "$mainUrl/browser?sort=popular" to "Popular"
+        "$mainUrl/movie" to "Movies",
+        "$mainUrl/tv" to "TV Series",
+        "$mainUrl/updates" to "Recently Added"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
