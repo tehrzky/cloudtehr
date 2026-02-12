@@ -27,16 +27,14 @@ class MovHub : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = "${request.data}&page=$page"
         val document = app.get(url, headers = headers).document
-        
+
         val items = document.select("div.movie-cards div.item").mapNotNull { item ->
             val poster = item.selectFirst("a.poster") ?: return@mapNotNull null
             val title = item.selectFirst("a.title")?.text() ?: return@mapNotNull null
             val itemUrl = fixUrl(poster.attr("href"))
             val posterUrl = item.selectFirst("img")?.attr("data-src") ?: ""
-            
-            val isSeries = itemUrl.contains("/tv/")
-            
-            if (isSeries) {
+
+            if (itemUrl.contains("/tv/")) {
                 newTvSeriesSearchResponse(title, itemUrl) {
                     this.posterUrl = posterUrl
                 }
@@ -46,9 +44,8 @@ class MovHub : MainAPI() {
                 }
             }
         }
-        
+
         val hasNextPage = document.selectFirst("li.page-item a[rel=next]") != null
-        
         return newHomePageResponse(request.name, items, hasNext = hasNextPage)
     }
 
@@ -58,16 +55,14 @@ class MovHub : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/browser?keyword=$query", headers = headers).document
-        
+
         return document.select("div.movie-cards div.item").mapNotNull { item ->
             val poster = item.selectFirst("a.poster") ?: return@mapNotNull null
             val title = item.selectFirst("a.title")?.text() ?: return@mapNotNull null
             val itemUrl = fixUrl(poster.attr("href"))
             val posterUrl = item.selectFirst("img")?.attr("data-src") ?: ""
-            
-            val isSeries = itemUrl.contains("/tv/")
-            
-            if (isSeries) {
+
+            if (itemUrl.contains("/tv/")) {
                 newTvSeriesSearchResponse(title, itemUrl) {
                     this.posterUrl = posterUrl
                 }
@@ -81,20 +76,18 @@ class MovHub : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
         val document = app.get(url, headers = headers).document
-        
+
         val title = document.selectFirst("h1.title")?.text() ?: "Unknown"
         val posterUrl = document.selectFirst("div.poster img")?.attr("src") ?: ""
         val plot = document.selectFirst(".description")?.text() ?: ""
-        
         val isMovie = document.selectFirst("ol.breadcrumb li a[href*='/movie']") != null
-        
         val genre = document.select("ul.mics li:has(a[href*=/genre/]) a").eachText()
         val year = document.selectFirst("ul.mics li:contains(Released:)")
             ?.text()?.substringAfter(":")?.trim()?.take(4)?.toIntOrNull()
-        
+
         val contentId = document.selectFirst("#movie-rating[data-id]")?.attr("data-id")
             ?: throw ErrorLoadingException("Content ID not found")
-        
+
         return if (isMovie) {
             newMovieLoadResponse(title, url, TvType.Movie, contentId) {
                 this.posterUrl = posterUrl
@@ -116,30 +109,29 @@ class MovHub : MainAPI() {
     private suspend fun getEpisodes(contentId: String, animeUrl: String): List<Episode> {
         val encryptedId = encrypt(contentId)
         val ajaxUrl = "$mainUrl/ajax/episodes/list?id=$contentId&_=$encryptedId"
-        
+
         val ajaxHeaders = headers + mapOf(
             "Accept" to "application/json, text/javascript, */*; q=0.01",
             "X-Requested-With" to "XMLHttpRequest",
             "Referer" to animeUrl
         )
-        
+
         val response = app.get(ajaxUrl, headers = ajaxHeaders).text
         val resultData = parseJson<ResultResponse>(response)
         val resultDoc = Jsoup.parse(resultData.result)
-        
+
         val episodes = mutableListOf<Episode>()
-        
+
         resultDoc.select("ul.episodes[data-season]").forEach { seasonElement ->
             val seasonNum = seasonElement.attr("data-season").toIntOrNull() ?: 1
-            
+
             seasonElement.select("li a").forEach { element ->
                 val episodeId = element.attr("eid")
                 val hasEpisodeNum = element.selectFirst("span.num") != null
-                
+
                 if (hasEpisodeNum) {
                     val epNum = element.attr("num").toIntOrNull() ?: 0
                     val epTitle = element.selectFirst("span:not(.num)")?.text()?.trim() ?: ""
-                    
                     episodes.add(
                         newEpisode(episodeId) {
                             this.name = "S$seasonNum E$epNum: $epTitle"
@@ -159,92 +151,76 @@ class MovHub : MainAPI() {
                 }
             }
         }
-        
+
         return episodes.reversed()
     }
 
     override suspend fun loadLinks(
-    data: String,
-    isCasting: Boolean,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-): Boolean {
-    val episodeId = data
-    
-    try {
-        val encryptedId = encrypt(episodeId)
-        val serversUrl = "$mainUrl/ajax/links/list?eid=$episodeId&_=$encryptedId"
-        
-        val ajaxHeaders = headers + mapOf(
-            "Accept" to "application/json, text/javascript, */*; q=0.01",
-            "X-Requested-With" to "XMLHttpRequest"
-        )
-        
-        val serversResponse = app.get(serversUrl, headers = ajaxHeaders).text
-        val serversData = parseJson<ResultResponse>(serversResponse)
-        val serversDoc = Jsoup.parse(serversData.result)
-        
-        val servers = serversDoc.select("li.link-item a[data-lid]")
-        
-        servers.forEach { serverElement ->
-            val serverId = serverElement.attr("data-lid")
-            
-            if (serverId.isNotEmpty()) {
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        println("MovHub DEBUG - loadLinks called with data: $data")
+
+        try {
+            val encryptedId = encrypt(data)
+            val serversUrl = "$mainUrl/ajax/links/list?eid=$data&_=$encryptedId"
+
+            val ajaxHeaders = headers + mapOf(
+                "Accept" to "application/json, text/javascript, */*; q=0.01",
+                "X-Requested-With" to "XMLHttpRequest"
+            )
+
+            val serversResponse = app.get(serversUrl, headers = ajaxHeaders).text
+            println("MovHub DEBUG - Servers response: $serversResponse")
+
+            val serversData = parseJson<ResultResponse>(serversResponse)
+            val serversDoc = Jsoup.parse(serversData.result)
+
+            val servers = serversDoc.select("li.link-item a[data-lid]")
+            println("MovHub DEBUG - Found ${servers.size} servers")
+
+            servers.forEach { serverElement ->
+                val serverId = serverElement.attr("data-lid")
+                val serverName = serverElement.text()
+                println("MovHub DEBUG - Processing server: $serverName ($serverId)")
+
+                if (serverId.isEmpty()) return@forEach
+
                 try {
                     val encryptedServerId = encrypt(serverId)
                     val viewUrl = "$mainUrl/ajax/links/view?id=$serverId&_=$encryptedServerId"
-                    
+
                     val viewResponse = app.get(viewUrl, headers = ajaxHeaders).text
-                    val viewData = parseJson<ResultResponse>(viewResponse)
-                    val iframeUrl = viewData.result
-                    
-                    // Use loadExtractor - it will match RapidShareExtractor by domain
-                    loadExtractor(iframeUrl, mainUrl, subtitleCallback, callback)
-                    
+                    println("MovHub DEBUG - View response: $viewResponse")
+
+                    val iframeUrl = parseJson<ResultResponse>(viewResponse).result
+                    println("MovHub DEBUG - Iframe URL: $iframeUrl")
+
+                    // Directly call RapidShareExtractor since it's registered
+                    val extractor = RapidShareExtractor()
+                    extractor.getUrl(iframeUrl, mainUrl, subtitleCallback, callback)
+
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    println("MovHub DEBUG - Server error: ${e.message}")
                 }
             }
+
+            return true
+        } catch (e: Exception) {
+            println("MovHub DEBUG - loadLinks error: ${e.message}")
+            return false
         }
-        
-        return true
-    } catch (e: Exception) {
-        e.printStackTrace()
-        return false
     }
-}
 
     private suspend fun encrypt(text: String): String {
         val response = app.get("https://enc-dec.app/api/enc-movies-flix?text=$text").text
         return parseJson<ResultResponse>(response).result
     }
 
-    private suspend fun decrypt(text: String): String {
-        val response = app.get("https://enc-dec.app/api/dec-movies-flix?text=$text").text
-        println("MovHub DEBUG - Raw decrypt response: $response")
-        
-        return try {
-            // Parse as nested object
-            parseJson<DecryptedIframeResponse>(response).result.url
-        } catch (e: Exception) {
-            // Fallback: parse as simple string result
-            val jsonObj = org.json.JSONObject(response)
-            jsonObj.getString("result")
-        }
-    }
-
     @Serializable
     data class ResultResponse(
         val result: String
-    )
-
-    @Serializable
-    data class DecryptedIframeResponse(
-        val result: DecryptedResult
-    )
-
-    @Serializable
-    data class DecryptedResult(
-        val url: String
     )
 }
