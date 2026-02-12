@@ -22,9 +22,6 @@ class MovHub : MainAPI() {
         "$mainUrl/browse/trending" to "Trending",
         "$mainUrl/browse/latest" to "Latest",
         "$mainUrl/browse/top10" to "Top 10",
-        "$mainUrl/movie" to "Movies",
-        "$mainUrl/tv" to "TV Series",
-        "$mainUrl/updates" to "Recently Added"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
