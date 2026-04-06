@@ -17,6 +17,7 @@ include(
 //    "OnlineSerieTV",
     "MovHub",
     "StreamingCommunity",
+    "TokuZilla",
 //    "Stremio",
 //    "SyncStream.Beta",
 //    "SyncStream",
