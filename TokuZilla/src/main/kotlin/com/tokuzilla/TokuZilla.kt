@@ -24,7 +24,7 @@ class TokuZilla : MainAPI() {
         "/categories/kamen-rider" to "Kamen Rider",
         "/ultraman" to "Ultraman",
         "/categories/super-sentai" to "Super Sentai",
-        "/power-ranger" to "Power Rangers"
+        "/garo" to "Garo"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
